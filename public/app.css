@@ -1,34 +1,42 @@
 /* Global Call CRM —— 手機先，電腦都用得 */
+/* 配色跟官網 globalcall.com.hk（2026-10-15 由佢個 theme 抄）：
+   主藍 #046CB5（logo 個藍）· 深藍 #0e2753（頁頭）· 淺藍 #D4ECFA · logo 紅 #EB2027 · 橙 #f54900 */
 :root {
-  --bg: #f4f5f7; --card: #ffffff; --ink: #1b1d21; --muted: #5d636e; --line: #dfe2e7;
-  --accent: #1f5fbf; --accent-ink: #ffffff; --accent-soft: #e7effb;
-  --ok: #1d7a46; --ok-soft: #e3f4ea; --warn: #9a5b00; --warn-soft: #fff1d6;
-  --bad: #b3172f; --bad-soft: #fde7ea; --r: #6b3fb8; --r-soft: #efe7fb; --d: #0f7a7a; --d-soft: #def3f3;
-  --radius: 10px; --gap: 12px;
+  --bg: #f2f4f7; --card: #ffffff; --ink: #111111; --muted: #5f6672; --line: #e4e7ec;
+  --brand: #0e2753; --brand-ink: #ffffff; --brand-red: #eb2027;
+  --accent: #046cb5; --accent-deep: #00417d; --accent-ink: #ffffff; --accent-soft: #e6f3fc; --accent-mid: #d4ecfa;
+  --ok: #027a48; --ok-soft: #ecfdf3; --warn: #9f2d00; --warn-soft: #fff7ed;
+  --bad: #d92d20; --bad-soft: #fee4e2; --r: #6941c6; --r-soft: #f4ebff; --d: #0e7a7a; --d-soft: #ddf4f4;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+  --radius: 12px; --gap: 12px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #15171b; --card: #1e2127; --ink: #eceef1; --muted: #a2a8b3; --line: #30343c;
-    --accent: #6ea0f0; --accent-ink: #0d1424; --accent-soft: #1f2c44;
-    --ok: #6fd39a; --ok-soft: #173326; --warn: #f0b75c; --warn-soft: #3a2b12;
-    --bad: #ff8fa0; --bad-soft: #3d1c22; --r: #b99bf0; --r-soft: #2c2342; --d: #6fd6d6; --d-soft: #163434;
+    --bg: #0a1428; --card: #12213d; --ink: #eef2f8; --muted: #9fb0c8; --line: #23365a;
+    --brand: #071226; --brand-ink: #eef2f8; --brand-red: #ff5a5f;
+    --accent: #5fb0ec; --accent-deep: #9fd1f5; --accent-ink: #04203a; --accent-soft: #143a5e; --accent-mid: #1b4a75;
+    --ok: #6ce9a6; --ok-soft: #10332a; --warn: #ffb27a; --warn-soft: #3a220f;
+    --bad: #ff8a80; --bad-soft: #3d1a1c; --r: #c3a6ff; --r-soft: #2a2148; --d: #6fd6d6; --d-soft: #123536;
+    --shadow: none;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #15171b; --card: #1e2127; --ink: #eceef1; --muted: #a2a8b3; --line: #30343c;
-  --accent: #6ea0f0; --accent-ink: #0d1424; --accent-soft: #1f2c44;
-  --ok: #6fd39a; --ok-soft: #173326; --warn: #f0b75c; --warn-soft: #3a2b12;
-  --bad: #ff8fa0; --bad-soft: #3d1c22; --r: #b99bf0; --r-soft: #2c2342; --d: #6fd6d6; --d-soft: #163434;
+  --bg: #0a1428; --card: #12213d; --ink: #eef2f8; --muted: #9fb0c8; --line: #23365a;
+  --brand: #071226; --brand-ink: #eef2f8; --brand-red: #ff5a5f;
+  --accent: #5fb0ec; --accent-deep: #9fd1f5; --accent-ink: #04203a; --accent-soft: #143a5e; --accent-mid: #1b4a75;
+  --ok: #6ce9a6; --ok-soft: #10332a; --warn: #ffb27a; --warn-soft: #3a220f;
+  --bad: #ff8a80; --bad-soft: #3d1a1c; --r: #c3a6ff; --r-soft: #2a2148; --d: #6fd6d6; --d-soft: #123536;
+  --shadow: none;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 /* ❗.btn／.row 有 display，會蓋過 hidden attribute —— 冇呢句「載多啲」「改時間」格會一直見到 */
 [hidden] { display: none !important; }
 html, body { margin: 0; }
-body { background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "PingFang HK", "Noto Sans HK", "Microsoft JhengHei", sans-serif;
-       padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 "Inter", system-ui, -apple-system, "PingFang HK", "Noto Sans HK", "Microsoft JhengHei", sans-serif;
+       padding-bottom: calc(72px + env(safe-area-inset-bottom)); -webkit-tap-highlight-color: transparent; }
 a { color: var(--accent); }
 h1 { font-size: 1.25rem; margin: 0 0 4px; }
 h2 { font-size: 1.05rem; margin: 18px 0 8px; }
@@ -36,27 +44,39 @@ h2 { font-size: 1.05rem; margin: 18px 0 8px; }
 .muted { color: var(--muted); }
 .small { font-size: .85rem; }
 
-.top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 10px 16px;
-       background: var(--card); border-bottom: 1px solid var(--line); }
-.brand { font-weight: 700; text-decoration: none; color: var(--ink); white-space: nowrap; }
-.tabs { display: flex; gap: 4px; }
-.tabs a { padding: 6px 10px; border-radius: 8px; text-decoration: none; color: var(--muted); white-space: nowrap; }
-.tabs a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px;
+       padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top));
+       background: var(--brand); color: var(--brand-ink); }
+.brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; text-decoration: none; color: var(--brand-ink);
+         white-space: nowrap; letter-spacing: .02em; }
+.brand img { width: 30px; height: 30px; background: #fff; border-radius: 50%; padding: 2px; }
+.brand small { font-weight: 600; font-size: .72rem; padding: 1px 6px; border-radius: 99px; background: rgba(255,255,255,.14); }
+.tabs { display: flex; gap: 4px; margin-left: auto; }
+.tabs a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; text-decoration: none;
+          color: rgba(255,255,255,.78); white-space: nowrap; font-weight: 500; }
+.tabs a svg { width: 18px; height: 18px; flex: none; }
+.tabs a:hover { color: #fff; background: rgba(255,255,255,.08); }
+.tabs a.on { background: rgba(255,255,255,.16); color: #fff; font-weight: 600; }
 @media (max-width: 720px) {
-  .top { padding: 10px 16px; }
-  .tabs { position: fixed; left: 0; right: 0; bottom: 0; justify-content: space-around; gap: 0; background: var(--card);
-          border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
-  .tabs a { flex: 1; text-align: center; font-size: .9rem; padding: 8px 2px; }
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; justify-content: space-around; gap: 0; background: var(--card);
+          border-top: 1px solid var(--line); box-shadow: 0 -2px 12px rgba(16,24,40,.06);
+          padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); }
+  .tabs a { flex: 1; flex-direction: column; gap: 2px; text-align: center; font-size: .72rem; padding: 6px 2px; color: var(--muted);
+            border-radius: 10px; }
+  .tabs a svg { width: 22px; height: 22px; }
+  .tabs a:hover { color: var(--accent); background: transparent; }
+  .tabs a.on { color: var(--accent); background: var(--accent-soft); }
 }
 
 main { max-width: 980px; margin: 0 auto; padding: 16px; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-bottom: var(--gap); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-bottom: var(--gap); box-shadow: var(--shadow); }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
 .spread { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: var(--gap); }
-.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; text-align: center; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; text-align: center; box-shadow: var(--shadow); }
+.stat b { color: var(--accent); font-variant-numeric: tabular-nums; }
 .stat b { display: block; font-size: 1.6rem; line-height: 1.2; }
 .stat span { color: var(--muted); font-size: .8rem; }
 .stat.r b { color: var(--r); } .stat.d b { color: var(--d); }
@@ -138,3 +158,32 @@ details > summary { cursor: pointer; color: var(--accent); margin: 6px 0; }
 .mday .dnum { font-weight: 600; }
 .mday .dcount { font-size: .75rem; color: var(--accent); }
 @media (max-width: 560px) { .mday { min-height: 52px; padding: 3px; } .mday .dcount { font-size: .68rem; } }
+
+/* 2026-10-15 官網配色＋手機：撳得到、睇得清 */
+h1 { font-weight: 700; letter-spacing: -.01em; }
+h2 { font-weight: 700; }
+.btn.primary:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); }
+input:focus-visible, select:focus-visible, textarea:focus-visible, .btn:focus-visible, .outcomes button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.outcomes button { transition: background .12s, border-color .12s; }
+.outcomes button:active { background: var(--accent-soft); }
+/* 公司頁：電話做大粒掣，一撳就打（冷電最常撳嘅嘢） */
+.dials { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.dial { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 99px; text-decoration: none;
+        background: var(--accent); color: var(--accent-ink); font-weight: 600; font-variant-numeric: tabular-nums; min-height: 42px; }
+.dial svg { width: 17px; height: 17px; }
+.dial .lbl { font-weight: 500; opacity: .85; font-size: .82rem; }
+.dial:active { background: var(--accent-deep); }
+/* 手機：「記低」掣黐住底（喺記電話張卡入面），唔使捲落去先撳到 */
+@media (max-width: 720px) {
+  #save { position: sticky; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 5; min-height: 48px;
+          box-shadow: 0 4px 14px rgba(4,108,181,.28); }
+  #save:disabled { box-shadow: none; opacity: 1; background: var(--accent-mid); border-color: var(--accent-mid); color: var(--accent-deep); }
+  main { padding: 12px; }
+  .card { padding: 12px; }
+  input[type=text], input[type=search], input[type=number], input[type=date], input[type=datetime-local], input[type=email], select, textarea {
+    font-size: 16px; } /* iPhone 細過 16px 會自己 zoom 入去 */
+}
+/* 表頭／日子唔准一個字一行（「通／數」）—— 窄就喺 .scroll 入面打橫捲 */
+th, td:first-child { white-space: nowrap; }
+@media (max-width: 720px) { th, td { padding: 6px 5px; } }

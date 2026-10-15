@@ -13,7 +13,7 @@
 
 import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { baseUrlOf, clientIp, constantEq, esc, type Signer, type Throttle } from "./security.js";
+import { AUTH_LOGO, AUTH_PAGE_HEAD, baseUrlOf, clientIp, constantEq, esc, type Signer, type Throttle } from "./security.js";
 
 const CODE_TTL_MS = 5 * 60_000;
 const ACCESS_TTL_MS = 30 * 24 * 3600_000;
@@ -57,27 +57,10 @@ export function authorizePage(params: Record<string, string>, error?: string): s
 <html lang="zh-HK"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Global Call CRM —— 授權</title>
-<link rel="icon" href="data:,">
-<style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, -apple-system, "PingFang HK", "Noto Sans HK", sans-serif;
-         display: grid; place-items: center; min-height: 100vh; margin: 0; background: #f4f5f7; color: #1b1d21; }
-  @media (prefers-color-scheme: dark) { body { background: #16181c; color: #eceef1; } }
-  form { width: min(92vw, 26rem); padding: 2rem; border-radius: 14px; background: Canvas;
-         box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 8px 28px rgba(0,0,0,.10); }
-  h1 { font-size: 1.15rem; margin: 0 0 .35rem; }
-  p { font-size: .875rem; opacity: .75; margin: 0 0 1.25rem; line-height: 1.5; }
-  label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: .4rem; }
-  input[type=password] { width: 100%; box-sizing: border-box; padding: .6rem .7rem; font-size: 1rem;
-         border: 1px solid #8884; border-radius: 8px; background: Canvas; color: CanvasText; }
-  button { width: 100%; margin-top: 1rem; padding: .65rem; font-size: .95rem; font-weight: 600; border: 0;
-           border-radius: 8px; background: #1f5fbf; color: #fff; cursor: pointer; }
-  .err { background: #d7263d18; border: 1px solid #d7263d55; color: #b3172f; padding: .55rem .7rem;
-         border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; }
-</style></head>
+${AUTH_PAGE_HEAD}</head>
 <body>
   <form method="post" action="/authorize">
-    <h1>Global Call CRM</h1>
+    ${AUTH_LOGO}
     <p>claude.ai 想連接你個 CRM（之後可以喺對話入面記電話、查公司）。<br>入你登入 CRM 嗰個密碼批准。</p>
     ${error ? `<div class="err">${esc(error)}</div>` : ""}
     <label for="pw">密碼</label>

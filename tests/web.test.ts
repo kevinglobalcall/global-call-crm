@@ -140,6 +140,8 @@ describe("公司頁：記電話", () => {
     const { d } = await companyPage();
     expect(d.querySelector("h1")!.textContent).toBe("大發物流有限公司");
     expect([...d.querySelectorAll('a[href^="tel:"]')].map((a) => a.getAttribute("href"))).toEqual(["tel:+85223456789"]);
+    // 手機一撳就打：撥號連結係大粒掣，顯示返號碼
+    expect([...d.querySelectorAll("a.dial")].map((a) => a.textContent!.trim())).toEqual(["2345 6789"]);
     expect(d.body.textContent).toContain("傳真 2345 6790");
     expect((d.querySelector("#attempt") as HTMLInputElement).value).toBe("3");
     expect(d.querySelectorAll("[data-outcome]").length).toBe(8);

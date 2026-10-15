@@ -115,6 +115,18 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
   `parseDbUrl()` 自己拋唔帶網址嘅錯、`tests/lib.test.ts` 驗錯誤訊息冇密碼（破壞測試紅過）。
   **寫任何會碰 secret 嘅錯誤處理，第一個問題係「呢句錯誤訊息印唔印得出 secret」。**
 
+## 外觀（Kevin 2026-10-15「使用官網配色方便手機瀏覽」）
+
+- **配色由官網 globalcall.com.hk 個 theme 抄**（`--wp--preset--color--*`），唔係估：主藍 `#046CB5`（＝logo 個藍）、
+  頁頭深藍 `#0e2753`（官網 hero 底色）、淺藍 `#D4ECFA`、logo 紅 `#EB2027`、橙 `#f54900`；字體 Inter ＋ Noto Sans HK。
+  中文公司名係 **國際電訊**（官網 /zh/ 個 title），唔好自己譯。
+- **logo／app icon 由官網 `logo-1200x628-4.png` 裁出嚟**（官網自己個 icon 得 80px，放大會矇）。
+  `public/` 有 logo／favicon／apple-touch-icon／icon-192／icon-512 ＋ `manifest.webmanifest`，iPhone「加到主畫面」似個 app。
+  `tests/server.test.ts` 會逐個 icon 讀 PNG 闊高對返 manifest 講嘅 sizes。
+- 手機：公司頁電話係大粒「一撳就打」掣（`.dial`）；「記低」掣黐住底；輸入格 16px（細過 iPhone 會自己 zoom）。
+- **改外觀要真係睇過**：`scripts/dev-seed.ts` 入示範資料（淨係肯行本機 DB），Chromium 390px 截晒五個 tab ＋ 公司頁 ＋ 登入頁，
+  淺色深色各一，`scrollWidth` 要等於 390（冇打橫捲）。今次就係咁捉到登入框爆出右邊、表頭一個字一行。
+
 ## 由 Equal 帶過嚟嘅工程教訓（全部中過）
 
 - **日子一律 `hkToday()`／`at time zone 'Asia/Hong_Kong'`**，唔准 `toISOString()` 當日子（香港凌晨 0–8 點 UTC 仲係前一日）。

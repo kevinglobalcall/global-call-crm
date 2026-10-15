@@ -19,7 +19,7 @@ import { ApiError, createApi, sendJson } from "./api.js";
 import { buildMcpServer } from "./mcp.js";
 import { createOAuth } from "./oauth.js";
 import {
-  baseUrlOf, clientIp, constantEq, COOKIE, createSigner, createThrottle, esc, readCookie,
+  AUTH_LOGO, AUTH_PAGE_HEAD, baseUrlOf, clientIp, constantEq, COOKIE, createSigner, createThrottle, esc, readCookie,
   sessionCookie, SESSION_TTL_MS,
 } from "./security.js";
 
@@ -58,24 +58,9 @@ function loginPage(error?: string): string {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Global Call CRM</title>
-<link rel="icon" href="data:,">
-<style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, -apple-system, "PingFang HK", "Noto Sans HK", sans-serif; display: grid;
-         place-items: center; min-height: 100vh; margin: 0; background: #f4f5f7; color: #1b1d21; }
-  @media (prefers-color-scheme: dark) { body { background: #16181c; color: #eceef1; } }
-  form { width: min(92vw, 22rem); padding: 2rem; border-radius: 14px; background: Canvas;
-         box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 8px 28px rgba(0,0,0,.10); }
-  h1 { font-size: 1.2rem; margin: 0 0 1.25rem; }
-  input { width: 100%; box-sizing: border-box; padding: .7rem; font-size: 1rem; border: 1px solid #8884;
-          border-radius: 8px; background: Canvas; color: CanvasText; }
-  button { width: 100%; margin-top: 1rem; padding: .7rem; font-size: 1rem; font-weight: 600; border: 0;
-           border-radius: 8px; background: #1f5fbf; color: #fff; }
-  .err { background: #d7263d18; border: 1px solid #d7263d55; color: #b3172f; padding: .55rem .7rem;
-         border-radius: 8px; font-size: .9rem; margin-bottom: 1rem; }
-</style></head>
+${AUTH_PAGE_HEAD}</head>
 <body><form method="post" action="/app/login">
-  <h1>Global Call CRM</h1>
+  ${AUTH_LOGO}
   ${error ? `<div class="err">${esc(error)}</div>` : ""}
   <input type="password" name="password" placeholder="密碼" autocomplete="current-password" autofocus required>
   <button type="submit">登入</button>

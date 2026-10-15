@@ -125,3 +125,36 @@ export function clientIp(req: IncomingMessage): string {
 export function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
+
+/**
+ * 登入頁同 claude.ai 授權頁共用嘅外觀（官網配色：深藍底、白卡、主藍掣）。
+ * ❗form 一定要 box-sizing: border-box —— 2026-10-15 之前 width 92vw 再加 2rem padding，
+ *   手機度張卡爆出右邊。
+ */
+export const AUTH_PAGE_HEAD = `<meta name="theme-color" content="#0e2753">
+<link rel="icon" type="image/png" href="/app/favicon.png">
+<link rel="apple-touch-icon" href="/app/apple-touch-icon.png">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Inter", system-ui, -apple-system, "PingFang HK", "Noto Sans HK", sans-serif; display: grid;
+         place-items: center; min-height: 100vh; min-height: 100dvh; margin: 0; padding: 16px; color: #111;
+         background: radial-gradient(120% 80% at 50% 0%, #1a3a6e 0%, #0e2753 55%, #081833 100%); }
+  form { width: 100%; max-width: 24rem; padding: 1.75rem 1.5rem; border-radius: 16px; background: #fff;
+         box-shadow: 0 12px 40px rgba(0,0,0,.30); }
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; }
+  .logo img { width: 40px; height: 40px; }
+  h1 { font-size: 1.15rem; margin: 0; letter-spacing: .01em; }
+  h1 small { display: block; font-size: .78rem; font-weight: 500; color: #5f6672; }
+  p { font-size: .875rem; color: #5f6672; margin: 0 0 1.25rem; line-height: 1.5; }
+  label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: .4rem; }
+  input[type=password] { width: 100%; padding: .75rem; font-size: 16px; border: 1px solid #d0d5dd;
+         border-radius: 10px; background: #fff; color: #111; }
+  input[type=password]:focus { outline: 2px solid #046cb5; outline-offset: 1px; border-color: #046cb5; }
+  button { width: 100%; margin-top: 1rem; padding: .8rem; font-size: 1rem; font-weight: 600; border: 0;
+           border-radius: 10px; background: #046cb5; color: #fff; cursor: pointer; }
+  button:hover { background: #00417d; }
+  .err { background: #fee4e2; border: 1px solid #fda29b; color: #b42318; padding: .55rem .7rem;
+         border-radius: 8px; font-size: .9rem; margin-bottom: 1rem; }
+</style>`;
+
+export const AUTH_LOGO = `<div class="logo"><img src="/app/logo.png" alt=""><h1>Global Call CRM<small>國際電訊 · 客戶跟進</small></h1></div>`;

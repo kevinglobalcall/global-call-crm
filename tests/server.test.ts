@@ -91,6 +91,26 @@ describe("開機同登入", () => {
     expect(r.status).toBe(429);
   });
 
+  it("登入頁有 logo；加到主畫面嘅 manifest 同每個 icon 都攞得到（唔使登入）", async () => {
+    const page = await (await fetch(`${base}/app/login`)).text();
+    for (const src of ["/app/logo.png", "/app/favicon.png", "/app/apple-touch-icon.png"]) {
+      expect(page).toContain(src);
+      const r = await fetch(`${base}${src}`);
+      expect([r.status, r.headers.get("content-type")]).toEqual([200, "image/png"]);
+    }
+    const mr = await fetch(`${base}/app/manifest.webmanifest`);
+    expect(mr.headers.get("content-type")).toBe("application/manifest+json");
+    const m = (await mr.json()) as { start_url: string; icons: { src: string; sizes: string }[] };
+    expect(m.start_url).toBe("/app");
+    for (const ic of m.icons) {
+      const r = await fetch(`${base}${ic.src}`);
+      expect(r.status).toBe(200);
+      // PNG 個闊高喺 byte 16–23：要同 manifest 講嘅 sizes 一樣
+      const b = Buffer.from(await r.arrayBuffer());
+      expect(`${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`).toBe(ic.sizes);
+    }
+  });
+
   it("API 寫入：唔係 JSON 唔收（擋 CSRF）；Origin 係第三方唔收", async () => {
     const cookie = await login();
     const form = await fetch(`${base}/app/api/companies`, {
