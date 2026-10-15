@@ -1,0 +1,75 @@
+# ⑦ 熄機／開返機／睇數（Fly）
+#
+# ❗熄機用 `scale count 0`，唔係 `machine stop`：fly.toml 寫住 auto_start_machines = true，
+#   stop 咗之後有人撳一下個網址就會自己醒返，等於冇熄。
+# ❗翻得轉頭：app、secrets、image 全部留喺 Fly。資料喺 Supabase，同呢度無關。
+
+name: ⑦ 熄機／開返機／睇數（Fly）
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "做咩"
+        required: true
+        type: choice
+        options:
+          # 第一項一定要係「唔做嘢」：下拉預設揀第一項，唔郁佢就撳 Run 寧願紅
+          - 請揀一個
+          - 睇數（唔郁嘢）
+          - 熄機（scale count 0）
+          - 開返機（scale count 1）
+
+jobs:
+  power:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: 預檢
+        id: pre
+        run: |
+          [ "${{ inputs.action }}" != "請揀一個" ] || { echo "::error::你冇揀做咩"; exit 1; }
+          [ -n "$FLY_API_TOKEN" ] || { echo "::error::FLY_API_TOKEN 未設定"; exit 1; }
+          APP=$(sed -nE 's/^app *= *"(.*)"/\1/p' fly.toml)
+          echo "app=$APP" >> "$GITHUB_OUTPUT"
+          flyctl machine list --app "$APP" || true
+
+      # 收錢嘅三樣：行緊嘅機、volume、專用 IPv4（共享嗰隻免費）—— 要 Fly 自己答，唔估
+      - name: 睇數
+        if: inputs.action == '睇數（唔郁嘢）'
+        env:
+          APP: ${{ steps.pre.outputs.app }}
+        run: |
+          echo "── 部機 ──"; flyctl machine list --app "$APP" || true
+          echo "── volume ──"; flyctl volumes list --app "$APP" || true
+          echo "── IP（專用 IPv4 ＝ US\$2/月；shared ＝ 免費）──"; flyctl ips list --app "$APP" || true
+          echo "── 個網 ──"; curl -fsS --max-time 10 "https://$APP.fly.dev/health" || echo "冇反應"
+
+      - name: 熄機
+        if: inputs.action == '熄機（scale count 0）'
+        env:
+          APP: ${{ steps.pre.outputs.app }}
+        run: |
+          flyctl scale count 0 --app "$APP" --yes
+          for i in $(seq 1 24); do
+            if curl -fsS --max-time 5 "https://$APP.fly.dev/health" >/dev/null 2>&1; then sleep 5; else
+              echo "::notice::✅ 熄咗 —— /health 冇反應"; exit 0; fi
+          done
+          echo "::error::兩分鐘之後 /health 仲答緊 —— 未熄乾淨"; exit 1
+
+      - name: 開返機
+        if: inputs.action == '開返機（scale count 1）'
+        env:
+          APP: ${{ steps.pre.outputs.app }}
+        run: |
+          flyctl scale count 1 --app "$APP" --yes
+          for i in $(seq 1 18); do
+            if out=$(curl -fsS --max-time 10 "https://$APP.fly.dev/health" 2>/dev/null); then
+              echo "::notice::✅ 返咗嚟：$out"; exit 0; fi
+            sleep 10
+          done
+          echo "::error::三分鐘都未返 —— 行一次「② 測試＋部署」"; exit 1

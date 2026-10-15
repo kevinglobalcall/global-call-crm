@@ -1,0 +1,109 @@
+# ① 開 Fly app／更新設定 —— 第一次撳一次；之後改咗密碼都係撳佢。
+#
+# 做嘅嘢（重撳幾多次都冇壞）：
+#   1. 開 Fly app（已經有就跳過）
+#   2. 攞 IP：IPv6 ＋ **共享** IPv4（免費；專用 IPv4 每月 US$2，唔要）
+#   3. 將 GitHub secrets 嘅 DATABASE_URL、APP_PASSWORD 搬落 Fly
+#   4. SESSION_SECRET：Fly 未有就自己出一條（唔經 GitHub、唔經對話）
+#
+# 事前要喺 GitHub repo → Settings → Secrets and variables → Actions 加：
+#   FLY_API_TOKEN  —— fly.io → Account → Access Tokens → Create（Org token）
+#   DATABASE_URL   —— Supabase → Connect → Session pooler 嗰條（記得換 [YOUR-PASSWORD]）
+#   APP_PASSWORD   —— 登入 CRM 嘅密碼（最少 10 個字）
+# 搞掂之後去 Actions 撳「② 測試＋部署」→ Run workflow。
+
+name: ① 開 Fly app／更新設定
+
+on:
+  workflow_dispatch:
+    inputs:
+      org:
+        description: "Fly org slug（唔知就留空，自動搵）"
+        required: false
+        default: ""
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: 檢查 GitHub secrets
+        run: |
+          bad=0
+          [ -n "$FLY_API_TOKEN" ] || { echo "::error::FLY_API_TOKEN 未設定"; bad=1; }
+          case "$DATABASE_URL" in
+            postgres://*|postgresql://*) ;;
+            "") echo "::error::DATABASE_URL 未設定"; bad=1 ;;
+            *) echo "::error::DATABASE_URL 唔似 Supabase 條連接字串（要 postgresql:// 開頭）"; bad=1 ;;
+          esac
+          case "$DATABASE_URL" in *YOUR-PASSWORD*|*'[YOUR'*) echo "::error::DATABASE_URL 入面仲係 [YOUR-PASSWORD] —— 換返你個 DB 密碼"; bad=1 ;; esac
+          if [ -n "$DATABASE_URL" ] && ! echo "$DATABASE_URL" | grep -q "pooler.supabase.com"; then
+            echo "::warning::DATABASE_URL 唔係 Session pooler 嗰條 —— 每晚備份（GitHub 冇 IPv6）可能駁唔到。建議用 Connect → Session pooler。"
+          fi
+          [ ${#APP_PASSWORD} -ge 10 ] || { echo "::error::APP_PASSWORD 未設定或者短過 10 個字"; bad=1; }
+          exit $bad
+
+      - name: 搵 org
+        id: org
+        run: |
+          org="${{ inputs.org }}"
+          if [ -z "$org" ]; then
+            org=$(flyctl orgs list --json 2>/dev/null | jq -r 'if type=="array" then (.[0].Slug // .[0].slug) else (to_entries[0].value) end' 2>/dev/null || true)
+          fi
+          if [ -z "$org" ] || [ "$org" = "null" ]; then
+            flyctl orgs list || true
+            echo "::error::搵唔到 org —— 上面清單揀個 slug，Run workflow 嗰陣填落 org 欄"
+            exit 1
+          fi
+          echo "org=$org" >> "$GITHUB_OUTPUT"
+
+      - name: 開 app（有就跳過）
+        id: app
+        run: |
+          APP=$(sed -nE 's/^app *= *"(.*)"/\1/p' fly.toml)
+          echo "app=$APP" >> "$GITHUB_OUTPUT"
+          if flyctl status --app "$APP" >/dev/null 2>&1; then
+            echo "app $APP 已經有。"
+          elif ! out=$(flyctl apps create "$APP" --org "${{ steps.org.outputs.org }}" 2>&1); then
+            echo "$out"
+            if echo "$out" | grep -qi "taken\|already"; then
+              echo "::error::Fly 個名「$APP」俾人用咗 —— 改 fly.toml 第一行個 app 名（例如加你個名），commit 咗再撳一次。"
+            fi
+            exit 1
+          fi
+
+      - name: 攞 IP（IPv6 ＋ 共享 IPv4，唔要專用 IPv4）
+        env:
+          APP: ${{ steps.app.outputs.app }}
+        run: |
+          ips=$(flyctl ips list --app "$APP" --json 2>/dev/null || echo "[]")
+          # ❗JSON 個 Type 欄名我哋未親眼見過 —— 認唔到就照試攞，已經有嘅話 flyctl 報錯都唔緊要
+          echo "$ips" | jq -e 'map(select(.Type=="v6")) | length > 0' >/dev/null || flyctl ips allocate-v6 --app "$APP" || true
+          echo "$ips" | jq -e 'map(select(.Type=="shared_v4" or .Type=="v4")) | length > 0' >/dev/null || flyctl ips allocate-v4 --shared --yes --app "$APP" || true
+          # 專用 IPv4 要錢 —— 見到就出聲
+          if flyctl ips list --app "$APP" | grep -E "^\s*v4\s" | grep -vqi shared; then
+            echo "::warning::見到專用 IPv4（每月 US\$2）—— 唔需要就去 Fly 釋放佢：flyctl ips release <IP>"
+          fi
+          flyctl ips list --app "$APP"
+
+      - name: 搬 secrets 落 Fly（唔印出嚟）
+        env:
+          APP: ${{ steps.app.outputs.app }}
+        run: |
+          have=$(flyctl secrets list --app "$APP" 2>/dev/null || true)
+          {
+            printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
+            printf 'APP_PASSWORD=%s\n' "$APP_PASSWORD"
+            if ! echo "$have" | grep -qw SESSION_SECRET; then
+              printf 'SESSION_SECRET=%s\n' "$(openssl rand -base64 48 | tr -d '\n')"
+              echo "出咗新 SESSION_SECRET" >&2
+            fi
+          } | flyctl secrets import --stage --app "$APP"
+          flyctl secrets list --app "$APP"
+          echo "::notice::設定好。下一步：Actions → 「② 測試＋部署」→ Run workflow（已經部署過嘅話，改完密碼都要撳一次佢先生效）。"

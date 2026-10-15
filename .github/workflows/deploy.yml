@@ -1,0 +1,107 @@
+# ② 測試＋部署
+#
+# 每個 PR、每次 push 都跑測試（真 Postgres 16 行真 migration）。
+# push 落 main 而且測試全綠 → 部署上 Fly → 打真 /health 對返 commit 先算數。
+# ❗測試紅 ＝ 唔部署：CRM 會停喺舊版，所以 merge 之前本機都要行足 npm test。
+
+name: ② 測試＋部署
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: 跑測試
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  deploy:
+    name: 部署
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: 預檢（app 開咗未？secrets 齊未？）
+        id: preflight
+        run: |
+          APP=$(sed -nE 's/^app *= *"(.*)"/\1/p' fly.toml)
+          echo "app=$APP" >> "$GITHUB_OUTPUT"
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GitHub secret FLY_API_TOKEN 未設定 —— 跳過部署（測試照跑咗）。"
+            exit 0
+          fi
+          if ! flyctl status --app "$APP" >/dev/null 2>&1; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Fly app $APP 未開 —— 去 Actions 撳「① 開 Fly app／更新設定」，再 re-run 呢個。"
+            exit 0
+          fi
+          have=$(flyctl secrets list --app "$APP" 2>/dev/null || true)
+          missing=""
+          for s in DATABASE_URL APP_PASSWORD SESSION_SECRET; do
+            echo "$have" | grep -qw "$s" || missing="$missing $s"
+          done
+          if [ -n "$missing" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Fly secrets 仲差：$missing —— 撳一次「① 開 Fly app／更新設定」（佢由 GitHub secrets 搬過去）。"
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      # migration 由 fly.toml 個 release_command 行（喺 Fly 臨時機，用 Fly 嗰條 DATABASE_URL）；
+      # 行唔過就唔會換新版。--ha=false：一部機就夠（預設兩部 ＝ 雙倍錢）。
+      - name: 部署
+        if: steps.preflight.outputs.ready == 'true'
+        run: flyctl deploy --remote-only --ha=false --build-arg BUILD_SHA="$GITHUB_SHA"
+
+      - name: 驗：打真 /health，build 要係呢個 commit
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          APP: ${{ steps.preflight.outputs.app }}
+        run: |
+          want="${GITHUB_SHA:0:12}"
+          for i in $(seq 1 12); do
+            got=$(curl -fsS --max-time 10 "https://$APP.fly.dev/health" | sed -nE 's/.*"build":"([^"]*)".*/\1/p' || true)
+            if [ "$got" = "$want" ]; then
+              echo "::notice::✅ https://$APP.fly.dev 行緊 $want"
+              exit 0
+            fi
+            echo "($i/12) 而家行緊：${got:-（冇反應）}，等緊 $want…"
+            sleep 10
+          done
+          echo "::error::部署咗但 /health 唔係報 $want —— 新版未起到。睇 https://fly.io/apps/$APP/monitoring"
+          exit 1
+
+      - name: 未部署，講清楚差咩
+        if: steps.preflight.outputs.ready != 'true'
+        run: echo "測試全過，但部署跳過咗 —— 睇上面「預檢」嗰步嘅黃色訊息。"
