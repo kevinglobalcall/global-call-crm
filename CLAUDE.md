@@ -106,6 +106,14 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
 - **Fly org 要用 slug 唔係顯示名**（2026-10-15 ① 第一次跑紅）：`flyctl orgs list --json` 回 `{slug: 名}`，
   個人帳戶個「名」係 email；拎咗 value 就變「organization kevinglobalcall@gmail.com not found」。
   而家攞 key、有 `personal` 優先，用之前 `flyctl orgs show` 驗一次。
+- **❗DB 密碼淨用英文字母＋數字；錯誤訊息唔准帶連接字串**（2026-10-15 ② 第一次部署紅）：
+  Kevin 個 Supabase 密碼有 `^ * % & #`，`flyctl secrets import`（dotenv 式）食咗 `#` 之後成截，
+  Fly 臨時機行 migration 嗰陣 Node `new URL()` 報 Invalid URL，**連 `input`（半截密碼）印咗落 Actions log**。
+  ❗**個 repo 係 public**，而 GitHub 淨係遮「成條 secret 一模一樣」嘅字串 —— 半截照出。
+  執法：即刻刪咗嗰個 run 嘅 log（MCP `delete_workflow_run_logs`，再攞 404 先算刪咗）＋叫 Kevin 重設密碼。
+  而家三重擋：`scripts/check-db-url.mjs`（① 同 ② 都行，GitHub 呢邊就擋，唔印網址）、
+  `parseDbUrl()` 自己拋唔帶網址嘅錯、`tests/lib.test.ts` 驗錯誤訊息冇密碼（破壞測試紅過）。
+  **寫任何會碰 secret 嘅錯誤處理，第一個問題係「呢句錯誤訊息印唔印得出 secret」。**
 
 ## 由 Equal 帶過嚟嘅工程教訓（全部中過）
 

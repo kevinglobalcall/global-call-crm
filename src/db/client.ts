@@ -42,8 +42,31 @@ export function readDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string {
   if (!/^postgres(ql)?:\/\//.test(url)) {
     throw new Error("DATABASE_URL 格式唔啱（應該 postgresql:// 開頭）");
   }
+  parseDbUrl(url);
   return url;
 }
+
+/**
+ * 解條連接字串；解唔到就拋一個**唔帶條網址**嘅錯。
+ * ❗Node 自己個 `TypeError: Invalid URL` 會連 `input` 一齊印 —— 2026-10-15 就係噉將
+ *   半截 DB 密碼印咗落 public repo 嘅 Actions log（GitHub 淨係遮成條 secret，半截唔遮）。
+ */
+export function parseDbUrl(url: string): URL {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new Error(BAD_URL);
+  }
+  // 冇 host 淨係 unix socket（`postgres:///db?host=/tmp`）先得
+  if (!u.hostname && !u.searchParams.get("host")) throw new Error(BAD_URL);
+  return u;
+}
+
+const BAD_URL =
+  "DATABASE_URL 唔係一條完整網址 —— 多數係 DB 密碼有 # @ / ? & % 呢類符號。\n" +
+  "去 Supabase → Project Settings → Database → Reset database password，" +
+  "揀一個淨係英文字母＋數字嘅密碼，再更新 GitHub secret DATABASE_URL。";
 
 /**
  * 本機（127.0.0.1／localhost／unix socket）唔使 TLS；其他一律 require ——
@@ -51,7 +74,7 @@ export function readDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string {
  * 網址自己寫咗 sslmode 就跟網址。
  */
 export function sslFor(url: string): "require" | false | undefined {
-  const u = new URL(url);
+  const u = parseDbUrl(url);
   if (u.searchParams.has("sslmode")) return undefined;
   const host = u.hostname.replace(/^\[|\]$/g, "");
   if (host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1" || host.startsWith("/")) return false;

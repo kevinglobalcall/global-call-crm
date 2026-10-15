@@ -37,15 +37,7 @@ jobs:
         run: |
           bad=0
           [ -n "$FLY_API_TOKEN" ] || { echo "::error::FLY_API_TOKEN 未設定"; bad=1; }
-          case "$DATABASE_URL" in
-            postgres://*|postgresql://*) ;;
-            "") echo "::error::DATABASE_URL 未設定"; bad=1 ;;
-            *) echo "::error::DATABASE_URL 唔似 Supabase 條連接字串（要 postgresql:// 開頭）"; bad=1 ;;
-          esac
-          case "$DATABASE_URL" in *YOUR-PASSWORD*|*'[YOUR'*) echo "::error::DATABASE_URL 入面仲係 [YOUR-PASSWORD] —— 換返你個 DB 密碼"; bad=1 ;; esac
-          if [ -n "$DATABASE_URL" ] && ! echo "$DATABASE_URL" | grep -q "pooler.supabase.com"; then
-            echo "::warning::DATABASE_URL 唔係 Session pooler 嗰條 —— 每晚備份（GitHub 冇 IPv6）可能駁唔到。建議用 Connect → Session pooler。"
-          fi
+          node scripts/check-db-url.mjs || bad=1
           [ ${#APP_PASSWORD} -ge 10 ] || { echo "::error::APP_PASSWORD 未設定或者短過 10 個字"; bad=1; }
           exit $bad
 

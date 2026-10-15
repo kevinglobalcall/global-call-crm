@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sslFor } from "../src/db/client.js";
+import { readDatabaseUrl, sslFor } from "../src/db/client.js";
 import { parseCsv, toCsv } from "../src/lib/csv.js";
 import { formatPhone, labelFromText, normalizePhone, parsePhoneCell } from "../src/lib/phone.js";
 import { blankToNull, escapeLike, nameKey, nospace } from "../src/lib/text.js";
@@ -129,5 +129,25 @@ describe("DB 連線 TLS", () => {
     expect(sslFor("postgresql://postgres@127.0.0.1:55432/postgres")).toBe(false);
     expect(sslFor("postgresql://postgres@localhost/postgres")).toBe(false);
     expect(sslFor("postgresql://u:p@db.example.com/x?sslmode=verify-full")).toBeUndefined();
+  });
+
+  it("❗密碼有符號解唔到 → 拋錯，但錯誤訊息唔准帶密碼（public repo 嘅 log 會漏）", () => {
+    const secret = "pX^J*z5%kV8&#tail";
+    const bad = [
+      `postgresql://postgres.abc:${secret}@aws-0.pooler.supabase.com:5432/postgres`,
+      "postgresql://postgres.abc:pX^J*z5%kV8&", // Fly 個 dotenv 食咗 # 之後嘅樣
+    ];
+    for (const url of bad) {
+      for (const f of [() => readDatabaseUrl({ DATABASE_URL: url }), () => sslFor(url)]) {
+        let msg = "";
+        try { f(); } catch (e) { msg = String(e instanceof Error ? e.message + (e as { input?: string }).input : e); }
+        expect(msg).toMatch(/淨係英文字母＋數字/);
+        expect(msg).not.toContain("pX^J");
+        expect(msg).not.toContain("postgres.abc");
+      }
+    }
+    const good = "postgresql://postgres.abc:Abc123xyz@aws-0.pooler.supabase.com:5432/postgres";
+    expect(readDatabaseUrl({ DATABASE_URL: good })).toBe(good);
+    expect(sslFor("postgres:///gc?host=/tmp")).toBe(false);
   });
 });
