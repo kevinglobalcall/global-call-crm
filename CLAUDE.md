@@ -103,6 +103,10 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
     vitest.config.ts、.gitignore；新加 tests/migrate.test.ts。
   - **救唔返**：scripts/crawl/*.py（爬蟲）、call list CSV／xlsx、黃頁快取。要 call list 就要 Kevin 畀返或者重爬。
 
+- **Fly org 要用 slug 唔係顯示名**（2026-10-15 ① 第一次跑紅）：`flyctl orgs list --json` 回 `{slug: 名}`，
+  個人帳戶個「名」係 email；拎咗 value 就變「organization kevinglobalcall@gmail.com not found」。
+  而家攞 key、有 `personal` 優先，用之前 `flyctl orgs show` 驗一次。
+
 ## 由 Equal 帶過嚟嘅工程教訓（全部中過）
 
 - **日子一律 `hkToday()`／`at time zone 'Asia/Hong_Kong'`**，唔准 `toISOString()` 當日子（香港凌晨 0–8 點 UTC 仲係前一日）。

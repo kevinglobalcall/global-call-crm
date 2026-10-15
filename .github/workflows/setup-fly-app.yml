@@ -54,13 +54,21 @@ jobs:
         run: |
           org="${{ inputs.org }}"
           if [ -z "$org" ]; then
-            org=$(flyctl orgs list --json 2>/dev/null | jq -r 'if type=="array" then (.[0].Slug // .[0].slug) else (to_entries[0].value) end' 2>/dev/null || true)
+            # ❗要 slug（ID），唔係顯示名：個人帳戶個顯示名係 email，用嚟開 app 會
+            #   「organization kevinglobalcall@gmail.com not found」（2026-10-15 撞過）。
+            #   `orgs list --json` 新版回 {slug: 名}、舊版回 [{Slug, Name}]；有 personal 就用 personal。
+            org=$(flyctl orgs list --json 2>/dev/null | jq -r '
+              if type=="array" then ((map(select((.Slug // .slug) == "personal")) | .[0]) // .[0]) | (.Slug // .slug)
+              elif type=="object" then (if has("personal") then "personal" else (to_entries[0].key) end)
+              else empty end' 2>/dev/null || true)
           fi
-          if [ -z "$org" ] || [ "$org" = "null" ]; then
+          if [ -z "$org" ] || [ "$org" = "null" ] || ! flyctl orgs show "$org" >/dev/null 2>&1; then
+            echo "── 你個 token 睇到嘅 org ──"
             flyctl orgs list || true
-            echo "::error::搵唔到 org —— 上面清單揀個 slug，Run workflow 嗰陣填落 org 欄"
+            echo "::error::org「${org}」用唔到 —— 上面清單左邊嗰欄（slug，唔係 email）揀一個，Run workflow 嗰陣填落 org 欄；個人帳戶通常係 personal"
             exit 1
           fi
+          echo "用緊 org：$org"
           echo "org=$org" >> "$GITHUB_OUTPUT"
 
       - name: 開 app（有就跳過）
