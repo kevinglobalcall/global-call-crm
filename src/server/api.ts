@@ -25,7 +25,7 @@ import { COMPANY_STATUSES, OUTCOMES, RULES } from "../domain/outcomes.js";
 import { createProduct, listProducts, updateProduct } from "../domain/products.js";
 import { addRemark, deleteRemark } from "../domain/remarks.js";
 import { dismissRenewal, renewalsDue } from "../domain/renewals.js";
-import { dailyStats, periodTotals, todayStats } from "../domain/stats.js";
+import { dailyStats, DETAIL_KINDS, periodTotals, statsDetail, todayStats, type DetailKind } from "../domain/stats.js";
 import { callbacksDue, callbacksUpcoming, cancelTask, completeTask, rescheduleTask } from "../domain/tasks.js";
 import { addDays, assertDay, hkToday, parseHkDateTime } from "../lib/time.js";
 
@@ -274,6 +274,16 @@ export function createApi(deps: { sql: () => Sql; now?: () => Date }) {
         dailyStats(sql, from, to), periodTotals(sql, from, to), periodTotals(sql, weekStart, today),
       ]);
       ok({ from, to, days, totals, week: { from: weekStart, to: today, ...week } });
+      return true;
+    }
+
+    // GET /stats/detail?kind=calls&from=&to= —— 撳個數睇係邊幾間
+    if (m === "GET" && path === "/app/api/stats/detail") {
+      const kind = url.searchParams.get("kind") ?? "";
+      if (!(DETAIL_KINDS as readonly string[]).includes(kind)) throw new ApiError(400, `kind 要係：${DETAIL_KINDS.join("／")}`);
+      const from = url.searchParams.get("from") || today;
+      const to = url.searchParams.get("to") || from;
+      ok({ kind, from, to, rows: await statsDetail(sql, kind as DetailKind, from, to) });
       return true;
     }
 

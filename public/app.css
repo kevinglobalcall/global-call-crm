@@ -228,3 +228,9 @@ th, td:first-child { white-space: nowrap; }
 /* 記完自動跳去下一間：捲到頂唔好俾黐頂嘅頁頭遮住，閃一閃話你知係呢間 */
 .crow { scroll-margin-top: calc(64px + env(safe-area-inset-top)); transition: background-color .4s; }
 .crow.nextup { background: var(--accent-soft); border-radius: 10px; }
+
+/* 數格撳得入去睇係邊幾間 */
+a.stat { display: block; text-decoration: none; color: inherit; }
+a.stat:hover { border-color: var(--accent); }
+a.stat:active { background: var(--accent-soft); }
+td.num a { font-weight: 600; }

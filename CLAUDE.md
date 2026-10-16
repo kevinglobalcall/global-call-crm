@@ -156,6 +156,13 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
 - ❗**auto 模式下改 CRM 資料（MCP 寫入）仍然會問 Kevin 批准**，而我唔准自己改權限設定（self-modification 被擋）。
   佢問「為什麼不停要允許」—— 答案係寫 production 資料嗰類動作；改 code、跑 test 唔會問。
 
+## 撳個數睇係邊幾間（Kevin 2026-10-16「要能夠點開顯示什麼公司」）
+
+- 今日、本星期、揀日子嗰幾格（`statTiles`）同每日表入面啲數全部係連結 → `#/stats/detail?kind=&from=&to=`。
+- `statsDetail()`（`src/domain/stats.ts`）嘅條件**一定要同 `dailyStats`／`periodTotals` 一模一樣**：
+  `tests/stats-detail.test.ts` 逐種、逐日、成段時間對「行數 ＝ 個數」（破壞測試紅過）。改計法要兩邊一齊改。
+- R／D 按間數 → 一間一行（攞嗰段時間最後一次）；約 ＝ 按約嗰日、取消唔計；見 ＝ 按見面日、已見。
+
 ## 外觀（Kevin 2026-10-15「使用官網配色方便手機瀏覽」）
 
 - **配色由官網 globalcall.com.hk 個 theme 抄**（`--wp--preset--color--*`），唔係估：主藍 `#046CB5`（＝logo 個藍）、

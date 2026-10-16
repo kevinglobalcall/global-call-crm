@@ -294,13 +294,7 @@
       var rate = s.calls ? Math.round((s.connected / s.calls) * 100) + "%" : "—";
       var html = '<div class="spread"><h1>今日 ' + esc(fmtDay(d.today)) + "</h1>" +
         '<a class="btn sm" href="#/companies?cold=1">打冷電名單 →</a></div>' +
-        '<div class="stats six">' +
-        '<div class="stat"><b data-k="calls">' + s.calls + "</b><span>通數</span></div>" +
-        '<div class="stat"><b data-k="connected">' + s.connected + "</b><span>接通（" + rate + "）</span></div>" +
-        '<div class="stat r"><b data-k="r">' + s.r + "</b><span>R 負責人</span></div>" +
-        '<div class="stat d"><b data-k="d">' + s.d + "</b><span>D 詳盡資料</span></div>" +
-        '<div class="stat a"><b data-k="booked">' + s.booked + "</b><span>約</span></div>" +
-        '<div class="stat a"><b data-k="met">' + s.met + "</b><span>見</span></div></div>";
+        statTiles(s, d.today, d.today, { connected: "接通（" + rate + "）", r: "R 負責人", d: "D 詳盡資料" }, true);
 
       if (d.appointments.length) {
         html += '<div class="card" id="todayAppts"><div class="spread"><h2 style="margin-top:0">今日見客（' + d.appointments.length + "）</h2>" +
@@ -320,8 +314,8 @@
       html += '<div class="card"><h2 style="margin-top:0">近 14 日</h2><div class="scroll"><table><thead><tr>' +
         '<th>日子</th><th class="num">通數</th><th class="num">接通</th><th class="num">R</th><th class="num">D</th><th class="num">約</th><th class="num">見</th></tr></thead><tbody>' +
         d.history.map(function (h) {
-          return "<tr><td>" + esc(fmtDay(h.day)) + '</td><td class="num">' + h.calls + '</td><td class="num">' + h.connected +
-            '</td><td class="num">' + h.r + '</td><td class="num">' + h.d + '</td><td class="num">' + h.booked + '</td><td class="num">' + h.met + "</td></tr>";
+          var n = function (k) { return '<td class="num">' + detailLink(k, h.day, h.day, h[k]) + "</td>"; };
+          return "<tr><td>" + esc(fmtDay(h.day)) + "</td>" + n("calls") + n("connected") + n("r") + n("d") + n("booked") + n("met") + "</tr>";
         }).join("") + "</tbody></table></div></div>";
       view().innerHTML = html;
       wireTasks(view(), render);
@@ -1017,30 +1011,71 @@
     });
   }
 
+  // ── 撳個數睇係邊幾間（Kevin 2026-10-16「要能夠點開顯示什麼公司」）────────────
+  var DETAIL_LABEL = { calls: "通數", connected: "接通", r: "R 負責人", d: "D 詳盡資料", booked: "約", met: "見" };
+  function detailHref(kind, from, to) {
+    return "#/stats/detail?kind=" + kind + "&from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to);
+  }
+  /** 表入面嘅數：0 就照寫 0（冇嘢好睇），有數先撳得 */
+  function detailLink(kind, from, to, n) {
+    return n ? '<a href="' + detailHref(kind, from, to) + '">' + n + "</a>" : String(n);
+  }
+  /** 六格數（今日／本星期／揀日子共用），每格撳入去睇係邊幾間 */
+  function statTiles(t, from, to, labels, keyed) {
+    var cls = { calls: "", connected: "", r: " r", d: " d", booked: " a", met: " a" };
+    return '<div class="stats six">' + ["calls", "connected", "r", "d", "booked", "met"].map(function (k) {
+      return '<a class="stat' + cls[k] + '" href="' + detailHref(k, from, to) + '"><b' + (keyed ? ' data-k="' + k + '"' : "") + ">" + t[k] +
+        "</b><span>" + esc((labels && labels[k]) || DETAIL_LABEL[k]) + "</span></a>";
+    }).join("") + "</div>";
+  }
+
+  function viewStatsDetail() {
+    var p = new URLSearchParams(location.hash.split("?")[1] || "");
+    var kind = p.get("kind") || "calls", from = p.get("from") || META.today, to = p.get("to") || from;
+    return api("/stats/detail?kind=" + encodeURIComponent(kind) + "&from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to)).then(function (d) {
+      var when = from === to ? fmtDay(from) : fmtDay(from) + " 至 " + fmtDay(to);
+      var perCo = kind === "r" || kind === "d";
+      var appt = kind === "booked" || kind === "met";
+      view().innerHTML = '<div class="spread"><h1>' + esc(DETAIL_LABEL[kind] || kind) + "：" + esc(when) + "（" + d.rows.length + "）</h1>" +
+        '<button class="btn sm" id="back">← 返轉頭</button></div>' +
+        '<div class="row" style="margin-bottom:10px">' + ["calls", "connected", "r", "d", "booked", "met"].map(function (k) {
+          return '<a class="btn sm' + (k === kind ? " primary" : "") + '" href="' + detailHref(k, from, to) + '">' + esc(DETAIL_LABEL[k]) + "</a>";
+        }).join("") + "</div>" +
+        (perCo ? '<p class="small muted">按間數：同一間打幾次都係一行（顯示最後嗰次）。</p>' : "") +
+        (kind === "booked" ? '<p class="small muted">嗰日約咗嘅（取消咗唔計），時間係見面時間。</p>' : "") +
+        '<div class="card" id="detail">' + (d.rows.length ? d.rows.map(function (r) {
+          return '<a class="item" href="#/c/' + esc(r.company_id) + '"><div class="spread"><span class="name">' + esc(r.name) + "</span>" +
+            '<span class="small muted">' + esc(r.code) + "</span></div>" +
+            '<div class="row small"><b>' + esc(fmt(r.at)) + "</b>" +
+            (r.attempt_no ? ' <span class="muted">第 ' + r.attempt_no + " 次</span>" : "") +
+            ' <span class="pill ' + (r.tag === "沒有人接" ? "" : "acc") + '">' + esc(r.tag) + "</span>" +
+            (appt ? "" : " " + rd(r.reached_r, r.got_d)) +
+            (r.extra ? ' <span class="muted">' + esc(appt ? r.extra : "D：" + r.extra) + "</span>" : "") + "</div>" +
+            (r.text ? '<div class="small pre">' + esc(r.text) + "</div>" : "") + "</a>";
+        }).join("") : '<p class="muted">冇</p>') + "</div>";
+      $("#back").addEventListener("click", function () { if (history.length > 1) history.back(); else location.hash = "#/"; });
+    });
+  }
+
   // ── 數 ──────────────────────────────────────────────────────────────────
   function viewStats() {
     var p = new URLSearchParams(location.hash.split("?")[1] || "");
     var to = p.get("to") || (META && META.today) || "";
     var from = p.get("from") || (to ? addDays(to, -29) : "");
     return api("/stats?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to)).then(function (d) {
-      var box = function (t) {
-        return '<div class="stats six"><div class="stat"><b>' + t.calls + '</b><span>通數</span></div><div class="stat"><b>' + t.connected +
-          '</b><span>接通</span></div><div class="stat r"><b>' + t.r + '</b><span>R（間）</span></div><div class="stat d"><b>' + t.d +
-          '</b><span>D（間）</span></div><div class="stat a"><b>' + t.booked + '</b><span>約</span></div><div class="stat a"><b>' + t.met +
-          "</b><span>見</span></div></div>";
-      };
+      var box = function (t, from, to) { return statTiles(t, from, to, { r: "R（間）", d: "D（間）" }, false); };
       var w = d.week;
       view().innerHTML = '<h1>每日數</h1>' +
-        '<h2 id="weekTitle">本星期（' + esc(fmtDay(w.from)) + " 至 " + esc(fmtDay(w.to)) + "）</h2>" + '<div id="week">' + box(w) + "</div>" +
+        '<h2 id="weekTitle">本星期（' + esc(fmtDay(w.from)) + " 至 " + esc(fmtDay(w.to)) + "）</h2>" + '<div id="week">' + box(w, w.from, w.to) + "</div>" +
         '<h2>揀日子</h2><div class="row" style="margin-bottom:10px">' +
         '<input type="date" id="from" value="' + esc(d.from) + '" style="width:auto"> 至 ' +
         '<input type="date" id="to" value="' + esc(d.to) + '" style="width:auto"> <button class="btn sm" id="go">睇</button></div>' +
-        box(d.totals) + '<div class="small muted" style="margin-bottom:8px">R、D 按間數：同一間一段時間 R 咗幾次都算 1。約＝嗰日約咗幾多個（取消咗唔計）；見＝嗰日見咗幾多個。</div>' +
+        box(d.totals, d.from, d.to) + '<div class="small muted" style="margin-bottom:8px">R、D 按間數：同一間一段時間 R 咗幾次都算 1。約＝嗰日約咗幾多個（取消咗唔計）；見＝嗰日見咗幾多個。</div>' +
         '<div class="card scroll"><table><thead><tr><th>日子</th><th class="num">通數</th><th class="num">接通</th><th class="num">接通率</th><th class="num">R</th><th class="num">D</th><th class="num">約</th><th class="num">見</th></tr></thead><tbody>' +
         d.days.map(function (h) {
-          return "<tr><td>" + esc(fmtDay(h.day)) + '</td><td class="num">' + h.calls + '</td><td class="num">' + h.connected + '</td><td class="num">' +
-            (h.calls ? Math.round((h.connected / h.calls) * 100) + "%" : "—") + '</td><td class="num">' + h.r + '</td><td class="num">' + h.d +
-            '</td><td class="num">' + h.booked + '</td><td class="num">' + h.met + "</td></tr>";
+          var n = function (k) { return '<td class="num">' + detailLink(k, h.day, h.day, h[k]) + "</td>"; };
+          return "<tr><td>" + esc(fmtDay(h.day)) + "</td>" + n("calls") + n("connected") + '<td class="num">' +
+            (h.calls ? Math.round((h.connected / h.calls) * 100) + "%" : "—") + "</td>" + n("r") + n("d") + n("booked") + n("met") + "</tr>";
         }).join("") + "</tbody></table></div>";
       $("#go").addEventListener("click", function () {
         location.hash = "#/stats?from=" + $("#from").value + "&to=" + $("#to").value;
@@ -1242,6 +1277,7 @@
     [/^#\/c\/([^/?]+)/, "companies", viewCompany],
     [/^#\/new/, "companies", viewNew],
     [/^#\/calendar/, "calendar", viewCalendar],
+    [/^#\/stats\/detail/, "stats", viewStatsDetail],
     [/^#\/stats/, "stats", viewStats],
     [/^#\/more/, "more", viewMore],
     [/^#\/import/, "more", viewImport],

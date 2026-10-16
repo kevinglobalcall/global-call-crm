@@ -88,3 +88,76 @@ export async function periodTotals(sql: Sql, from: string, to: string): Promise<
      where called_at >= ${start} and called_at < ${end}`;
   return row!;
 }
+
+// ── 撳個數睇係邊幾間（Kevin 2026-10-16「要能夠點開顯示什麼公司」）──────────────
+// ❗條件一定要同上面 dailyStats／periodTotals 一模一樣 —— 行數唔等如個數，Kevin 即刻唔信。
+//   tests/stats-detail.test.ts 逐種對：detail 行數 ＝ 個數。
+
+export const DETAIL_KINDS = ["calls", "connected", "r", "d", "booked", "met"] as const;
+export type DetailKind = (typeof DETAIL_KINDS)[number];
+
+export interface DetailRow {
+  company_id: string;
+  code: string;
+  name: string;
+  /** 電話嘅時間／約見面嘅時間 */
+  at: Date;
+  /** 結果（沒有人接…）或者約會狀態（已約／已見…） */
+  tag: string;
+  attempt_no: number | null;
+  reached_r: boolean;
+  got_d: boolean;
+  /** 電話內容／見面目的／見面備註 */
+  text: string | null;
+  /** 約：幾時約嘅；R／D：嗰日最後一次嘅 D 資料 */
+  extra: string | null;
+}
+
+export async function statsDetail(sql: Sql, kind: DetailKind, from: string, to: string): Promise<DetailRow[]> {
+  assertDay(from);
+  assertDay(to);
+  if (from > to) throw new Error(`由 ${from} 到 ${to}？開始日喺完結日之後`);
+  if (addDays(from, 400) < to) throw new Error("一次最多睇 400 日");
+  const start = hkDayStart(from);
+  const end = hkDayStart(addDays(to, 1));
+  const name = sql`coalesce(nullif(btrim(c.name_zh), ''), c.name_en)`;
+  const dInfo = sql`nullif(concat_ws(' · ', k.d_provider, case when k.d_contract_end is not null then '約滿 ' || k.d_contract_end end, k.d_price, k.d_plan), '')`;
+  switch (kind) {
+    case "calls":
+    case "connected":
+      return sql<DetailRow[]>`
+        select k.company_id, c.code, ${name} as name, k.called_at as at, k.outcome as tag, k.attempt_no,
+               k.reached_r, k.got_d, k.content as text, ${dInfo} as extra
+          from public.calls k join public.companies c on c.id = k.company_id
+         where k.called_at >= ${start} and k.called_at < ${end}
+           ${kind === "connected" ? sql`and k.outcome <> '沒有人接'` : sql``}
+         order by k.called_at desc`;
+    case "r":
+    case "d": {
+      // 按間數：同一間一段時間 R 幾次都係一行（攞最後嗰次）
+      const flag = kind === "r" ? sql`k.reached_r` : sql`k.got_d`;
+      return sql<DetailRow[]>`
+        select * from (
+          select distinct on (k.company_id) k.company_id, c.code, ${name} as name, k.called_at as at, k.outcome as tag,
+                 k.attempt_no, k.reached_r, k.got_d, k.content as text, ${dInfo} as extra
+            from public.calls k join public.companies c on c.id = k.company_id
+           where k.called_at >= ${start} and k.called_at < ${end} and ${flag}
+           order by k.company_id, k.called_at desc
+        ) x order by at desc`;
+    }
+    case "booked":
+    case "met":
+      return sql<DetailRow[]>`
+        select a.company_id, c.code, ${name} as name, a.starts_at as at, a.status as tag, null::int as attempt_no,
+               false as reached_r, false as got_d,
+               coalesce(nullif(btrim(a.meeting_notes), ''), a.purpose) as text,
+               nullif(concat_ws(' · ', ct.name, ct.title), '') as extra
+          from public.appointments a
+          join public.companies c on c.id = a.company_id
+          left join public.contacts ct on ct.id = a.contact_id
+         where ${kind === "booked"
+           ? sql`a.created_at >= ${start} and a.created_at < ${end} and a.status <> '取消'`
+           : sql`a.starts_at >= ${start} and a.starts_at < ${end} and a.status = '已見'`}
+         order by a.starts_at desc`;
+  }
+}

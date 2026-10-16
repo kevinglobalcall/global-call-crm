@@ -337,6 +337,33 @@ describe("公司清單", () => {
   });
 });
 
+describe("撳個數睇係邊幾間（Kevin：要能夠點開顯示什麼公司）", () => {
+  it("今日六格都係連結，帶 kind 同今日日子", async () => {
+    const { d } = await boot("#/", { "/meta": META, "/today": TODAY, "/tasks": { ok: true } });
+    const hrefs = [...d.querySelectorAll("a.stat")].map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["calls", "connected", "r", "d", "booked", "met"]
+      .map((k) => `#/stats/detail?kind=${k}&from=${TODAY.today}&to=${TODAY.today}`));
+    // data-k 照留（其他 test 同截圖腳本靠佢）
+    expect(d.querySelector('a.stat [data-k="calls"]')).toBeTruthy();
+  });
+
+  it("detail 頁：每行連去間公司，出時間、第幾次、結果、內容", async () => {
+    const DETAIL = { kind: "r", from: "2026-10-16", to: "2026-10-16", rows: [{
+      company_id: CID, code: "GC-00012", name: "大發物流有限公司", at: "2026-10-16T03:30:00.000Z", tag: "需要跟進",
+      attempt_no: 2, reached_r: true, got_d: true, text: "IT 經理陳生", extra: "CSL · 約滿 2027-03-31" }] };
+    const { d, calls } = await boot("#/stats/detail?kind=r&from=2026-10-16&to=2026-10-16", { "/meta": META, "/stats/detail": DETAIL });
+    await tick();
+    expect(calls.find((c) => c.url.startsWith("/app/api/stats/detail"))!.url).toBe("/app/api/stats/detail?kind=r&from=2026-10-16&to=2026-10-16");
+    expect(d.querySelector("h1")!.textContent).toBe("R 負責人：10/16（五）（1）");
+    const a = d.querySelector("#detail a.item")!;
+    expect(a.getAttribute("href")).toBe(`#/c/${CID}`);
+    expect(a.textContent).toContain("10/16（五）11:30");
+    expect(a.textContent).toContain("第 2 次");
+    expect(a.textContent).toContain("IT 經理陳生");
+    expect(a.textContent).toContain("D：CSL · 約滿 2027-03-31");
+  });
+});
+
 describe("公司清單每行：直接打、記結果、改狀態、寫備註（Kevin 2026-10-16）", () => {
   const ROW = {
     id: CID, code: "GC-00012", name_zh: "大發物流有限公司", name_en: "Tai Fat Logistics Ltd", status: "未打", ever_r: false, ever_d: false,
