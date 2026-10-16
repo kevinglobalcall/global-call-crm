@@ -118,4 +118,14 @@ describe("搜尋搵到備註記錄（Kevin 2026-10-16「備註記錄 也要searc
     await t.sql`update public.companies set status = '不需要' where id = ${a}`;
     expect((await listCompanies(t.sql, { q: "kelvin去咗旅行", cold: true }, 50)).total).toBe(0);
   });
+
+  it("❗備註字有數字唔會撞人哋電話：「CSL 150 1G」唔會因為 1501 搵出總機 3150 1111 嗰間；成句係電話先當電話搵", async () => {
+    const hit = await makeCompany(t.sql);
+    const phoneOnly = await makeCompany(t.sql, { phones: ["31501111"] });
+    await addRemark(t.sql, hit, "而家用 CSL 150 1G 24M");
+    const ids = async (q: string) => (await listCompanies(t.sql, { q }, 50)).rows.map((r) => r.id);
+    expect(await ids("CSL 150 1G")).toEqual([hit]);
+    expect(await ids("3150 1111")).toEqual([phoneOnly]);
+    expect(await ids("+852 3150-1111")).toEqual([phoneOnly]);
+  });
 });

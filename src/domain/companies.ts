@@ -92,7 +92,9 @@ function where(sql: Sql, f: CompanyFilters) {
   const q = (f.q ?? "").trim();
   if (q) {
     const key = `%${escapeLike(nospace(q))}%`;
-    const digits = q.replace(/\D/g, "");
+    // 淨係「成句似電話號碼」先當電話搵（數字、空格、+ - ( )）：「CSL 150 1G」唔好抽出 1501 去撞人哋電話
+    // 「+852 3150 1111」：剝走區號先搵（DB 存 8 位）
+    const digits = /^[\d\s+\-()]+$/.test(q) ? q.replace(/\D/g, "").replace(/^852(?=\d{8}$)/, "") : "";
     parts.push(sql`(
          public.nospace(o.name_zh) like ${key}
       or public.nospace(o.name_en) like ${key}
