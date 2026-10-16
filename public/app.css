@@ -248,3 +248,27 @@ td.num a { font-weight: 600; }
 /* 清單備註欄顯示晒：一條一行，太長就喺格入面捲，唔好成行拉到好長 */
 .lastnote { max-height: 168px; overflow-y: auto; }
 .lastnote .nline + .nline { margin-top: 3px; padding-top: 3px; border-top: 1px dashed var(--line); }
+
+/* 全站搜尋（頁頭）：電腦喺 logo 同 tab 中間；手機頁頭得 logo＋搜尋＋深淺色 */
+.gsearch { position: relative; flex: 1; max-width: 420px; min-width: 0; }
+.gsearch input { width: 100%; min-height: 36px; padding: 6px 12px; border-radius: 99px; border: 1px solid rgba(255,255,255,.22);
+                 background: rgba(255,255,255,.10); color: #fff; font-size: 15px; }
+.gsearch input::placeholder { color: rgba(255,255,255,.62); }
+.gsearch input:focus-visible { outline: 2px solid #fff; outline-offset: 1px; background: rgba(255,255,255,.16); }
+.gres { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30; background: var(--card); color: var(--ink);
+        border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.28); max-height: 70vh; overflow-y: auto; }
+.gitem { display: block; padding: 9px 12px; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+.gitem:hover, .gitem:focus { background: var(--accent-soft); }
+.gitem .name { font-weight: 600; }
+.gall { display: block; padding: 9px 12px; font-weight: 600; text-decoration: none; }
+.gempty { padding: 10px 12px; }
+.tabs { margin-left: 0; }
+@media (min-width: 721px) { .gsearch { margin-right: auto; } }
+@media (max-width: 720px) {
+  .top { gap: 10px; }
+  .brand small { display: none; }
+  .gsearch { max-width: none; }
+  .gres { position: fixed; left: 8px; right: 8px; top: calc(56px + env(safe-area-inset-top)); }
+  .themebtn span { display: none; }
+  .themebtn { margin-left: 0; }
+}

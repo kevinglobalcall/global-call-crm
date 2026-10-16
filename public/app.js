@@ -1334,7 +1334,50 @@
     return Promise.resolve();
   }
 
-  window.addEventListener("hashchange", function () { render(); window.scrollTo(0, 0); });
+  window.addEventListener("hashchange", function () { closeSearch(); render(); window.scrollTo(0, 0); });
+
+  // ── 全站搜尋（Kevin 2026-10-16「全部頁面都要加全站search」）──────────────────
+  // 頁頭一格：打字 → 下拉出頭 8 間（名／電話／電郵／編號／聯絡人，空格唔理）；撳一間入公司頁；
+  // Enter → 公司清單（帶埋個字）；Esc 或者撳出面就收；喺任何頁撳「/」直接跳去格度。
+  var gTimer = null, gSeq = 0;
+  function closeSearch() { var r = $("#gres"); if (r) r.hidden = true; }
+  function runSearch() {
+    var q = $("#gq").value.trim(), box = $("#gres"), my = ++gSeq;
+    if (!q) { box.hidden = true; return; }
+    api("/companies?q=" + encodeURIComponent(q) + "&limit=8").then(function (r) {
+      if (my !== gSeq) return; // 打字快過 server：舊結果唔好蓋新結果
+      box.innerHTML = (r.rows.length ? r.rows.map(function (c) {
+        var ph = (c.phones || "").split(" / ").filter(function (x) { return !/傳真/.test(x); })[0] || "";
+        return '<a class="gitem" href="#/c/' + esc(c.id) + '"><span class="name">' + esc(nameOf(c)) + "</span> " +
+          (altName(c) ? '<span class="muted small">' + esc(altName(c)) + "</span> " : "") +
+          '<span class="small muted">' + esc(c.code) + (ph ? " · " + esc(ph.slice(0, 4) + " " + ph.slice(4)) : "") + "</span> " + statusPill(c.status) + "</a>";
+      }).join("") : '<div class="gempty muted small">搵唔到「' + esc(q) + "」</div>") +
+        (r.total > r.rows.length ? '<a class="gall" href="#/companies?q=' + encodeURIComponent(q) + '">睇晒 ' + r.total + " 間 →</a>" : "");
+      box.hidden = false;
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  (function () {
+    var input = $("#gq");
+    if (!input) return;
+    input.addEventListener("input", function () { clearTimeout(gTimer); gTimer = setTimeout(runSearch, 250); });
+    input.addEventListener("focus", function () { if (input.value.trim() && $("#gres").innerHTML) $("#gres").hidden = false; });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { closeSearch(); input.blur(); }
+      if (e.key === "Enter" && input.value.trim()) {
+        e.preventDefault();
+        location.hash = "#/companies?q=" + encodeURIComponent(input.value.trim());
+        closeSearch();
+      }
+    });
+    $("#gres").addEventListener("click", function (e) {
+      if (e.target.closest("a")) { closeSearch(); input.value = ""; }
+    });
+    document.addEventListener("click", function (e) { if (!e.target.closest(".gsearch")) closeSearch(); });
+    document.addEventListener("keydown", function (e) {
+      var tag = (document.activeElement && document.activeElement.tagName) || "";
+      if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(tag)) { e.preventDefault(); input.focus(); }
+    });
+  })();
   // ── 深淺色（頁頭粒掣：深色 → 淺色 → 跟系統 → 深色…）────────────────────────
   var THEMES = [
     ["dark", "深色", '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>'],

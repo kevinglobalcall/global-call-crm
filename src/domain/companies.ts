@@ -87,6 +87,9 @@ function where(sql: Sql, f: CompanyFilters) {
       or public.nospace(o.name_en) like ${key}
       or public.nospace(o.code)    like ${key}
       or public.nospace(o.emails)  like ${key}
+      or exists (select 1 from public.contacts ct where ct.company_id = o.id
+                    and (public.nospace(ct.name) like ${key} or public.nospace(ct.email) like ${key}
+                         ${digits.length >= 4 ? sql`or regexp_replace(coalesce(ct.phone, ''), '[^0-9]', '', 'g') like ${`%${digits}%`}` : sql``}))
       ${digits.length >= 4
         ? sql`or exists (select 1 from public.company_phones p
                           where p.company_id = o.id and p.phone like ${`%${digits}%`})`

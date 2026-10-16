@@ -82,3 +82,17 @@ describe("公司清單嘅「最新一條」", () => {
     expect([one.total, one.rows.map((r) => r.id), one.rows[0]!.last_note]).toEqual([1, [other], null]);
   });
 });
+
+describe("全站搜尋（Kevin 2026-10-16「全部頁面都要加全站search」）", () => {
+  it("搵聯絡人個名（空格唔理）、聯絡人手提（有空格都得）、聯絡人電郵，都搵到佢間公司", async () => {
+    const { addContact, listCompanies } = await import("../src/domain/companies.js");
+    const id = await makeCompany(t.sql);
+    await addContact(t.sql, id, { name: "Kenneth Wong", phone: "9123 4567", email: "kenneth@sustain.example" });
+    const hit = async (q: string) => (await listCompanies(t.sql, { q }, 10, 0)).rows.map((r) => r.id);
+    expect(await hit("kennethwong")).toContain(id);
+    expect(await hit("91234567")).toContain(id);
+    expect(await hit("9123 45")).toContain(id);
+    expect(await hit("kenneth@sustain")).toContain(id);
+    expect(await hit("Kenneth Lee")).not.toContain(id);
+  });
+});

@@ -338,6 +338,38 @@ describe("公司清單", () => {
   });
 });
 
+describe("全站搜尋（頁頭，任何頁都有）", () => {
+  const HIT = { total: 12, totalR: 0, totalD: 0, rows: [{ id: CID, code: "GC-00142", name_zh: "嘉華國際", name_en: null,
+    status: "未打", phones: "28800178", emails: "", call_count: 0 }] };
+
+  it("打字 → 等一陣先搵（帶 limit=8）→ 下拉出名、編號、電話；超過 8 間出「睇晒」；撳一間入公司頁", async () => {
+    const { d, calls } = await boot("#/calendar", { "/meta": META, "/appointments": [], "/companies": HIT });
+    const q = d.querySelector("#gq") as HTMLInputElement;
+    q.value = "2880 0178";
+    q.dispatchEvent(new d.defaultView!.Event("input"));
+    await tick(300);
+    expect(calls.filter((c) => c.url.startsWith("/app/api/companies?")).at(-1)!.url).toBe("/app/api/companies?q=2880%200178&limit=8");
+    const box = d.querySelector("#gres") as HTMLElement;
+    expect(box.hidden).toBe(false);
+    const item = box.querySelector("a.gitem")!;
+    expect(item.getAttribute("href")).toBe(`#/c/${CID}`);
+    expect(item.textContent).toContain("嘉華國際");
+    expect(item.textContent).toContain("GC-00142 · 2880 0178");
+    expect(box.querySelector("a.gall")!.textContent).toBe("睇晒 12 間 →");
+    click(item);
+    expect(box.hidden).toBe(true);
+    expect(q.value).toBe("");
+  });
+
+  it("Enter → 公司清單帶埋個字", async () => {
+    const { d } = await boot("#/", { "/meta": META, "/today": TODAY, "/companies": HIT });
+    const q = d.querySelector("#gq") as HTMLInputElement;
+    q.value = "嘉華";
+    q.dispatchEvent(new d.defaultView!.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(d.defaultView!.location.hash).toBe("#/companies?q=%E5%98%89%E8%8F%AF");
+  });
+});
+
 describe("深淺色（Kevin 2026-10-16「web也要dark mode」）", () => {
   it("預設深色（一開頁未行 app.js 已經套用）；撳掣：深 → 淺 → 跟系統 → 深，記低喺呢部機", async () => {
     const { d, w } = await boot("#/", { "/meta": META, "/today": TODAY, "/tasks": { ok: true } });
