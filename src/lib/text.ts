@@ -34,7 +34,9 @@ const EN_SUFFIX = new Set(["limited", "ltd", "company", "co", "corp", "corporati
  * —— SQL 入面 '' = '' 係 true，唔擋住就成批冇名嘅行會互相撞中（Equal 中過）。
  */
 export function nameKey(s: string | null | undefined): string {
-  const t = String(s ?? "").toLowerCase().replace(/&/g, " and ");
+  // ❗NFKC：全形英文數字（ＧＢＡ集團、健康１６０）變返半形先 —— 唔係下一行當佢係符號剝走，
+  //   ＧＢＡ集團、ＴＯＭ集團、ＷＴ集團 全部剩返「集團」撞埋一間（Kevin 2026-10-15 名單真係有）
+  const t = String(s ?? "").normalize("NFKC").toLowerCase().replace(/&/g, " and ");
   const words = t.split(/[^0-9a-z㐀-鿿]+/).filter((w) => w !== "");
   while (words.length > 1 && EN_SUFFIX.has(words[words.length - 1]!)) words.pop();
   let key = words.join("");

@@ -223,6 +223,9 @@ function planSummary(plan: ImportPlan) {
     mapping: plan.mapping,
     unmapped: plan.unmapped,
     counts: plan.counts,
+    byStatus: plan.byStatus,
+    unknownResults: plan.unknownResults,
+    conflicts: plan.conflicts,
     sample: plan.rows.filter((r) => r.action === "new").slice(0, 5).map((r) => ({
       line: r.line, name_zh: r.company.name_zh ?? null, name_en: r.company.name_en ?? null,
       phones: r.phones.map((p) => `${p.phone}${p.label === "傳真" ? "（傳真）" : ""}`), emails: r.emails,

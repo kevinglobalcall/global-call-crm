@@ -107,7 +107,8 @@ function orderBy(sql: Sql, s: CompanyFilters["sort"]) {
     case "code": return sql`o.code`;
     case "created": return sql`o.created_at desc, o.id`;
     case "contract_end": return sql`o.d_contract_end nulls last, o.id`;
-    case "never_called": return sql`o.call_count, o.code`;
+    // 未打嘅行先：名單匯入嗰啲「跟進中」冇電話記錄（call_count 0），唔加呢句會同真未打撈埋
+    case "never_called": return sql`(o.status <> '未打'), o.call_count, o.code`;
     case "recent":
     default: return sql`o.last_call_at desc nulls last, o.code`;
   }

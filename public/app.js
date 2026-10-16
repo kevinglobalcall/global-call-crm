@@ -943,7 +943,32 @@
     name: "公司名（有中文當中文名）", name_zh: "中文名", name_en: "英文名", phone: "電話", fax: "傳真", mobile: "手提",
     direct: "直線", email: "電郵", address: "地址（有中文當中文）", address_zh: "中文地址", address_en: "英文地址",
     industry: "行業", website: "網站", br_no: "BR", notes: "備註", customer_type: "客戶類型",
+    result: "聯絡結果（原文入備註記錄）", followup: "補充跟進（入備註記錄）",
   };
+  var STATUS_ORDER = ["未打", "跟進中", "不需要", "其他人跟進", "已成交", "已結業"];
+
+  /**
+   * 匯入預覽：之前打過嘅狀態幾多間；聯絡結果認唔到嘅逐行列出嚟（Kevin：「不明的問我 不要自己加狀態」）。
+   */
+  function importStatusHtml(p) {
+    var bs = p.byStatus || {};
+    var keys = STATUS_ORDER.filter(function (k) { return bs[k]; });
+    if (!(p.unknownResults || []).length && !(p.conflicts || []).length && keys.length <= 1) return "";
+    var list = function (rows) {
+      return rows.map(function (u) {
+        return '<div class="item small"><b>第 ' + u.line + " 行</b> " + esc(u.name) + ' <span class="muted">「' + esc(u.text) + "」</span></div>";
+      }).join("");
+    };
+    return '<h2>狀態（入咗之後）</h2><div class="chips" id="impStatus">' + keys.map(function (k) {
+      return '<span class="pill' + (k === "未打" ? "" : " acc") + '" data-st="' + esc(k) + '">' + esc(k) + " " + bs[k] + "</span>";
+    }).join(" ") + "</div>" +
+      '<p class="small muted">「聯絡結果」嗰欄嘅原文全部入公司嘅備註記錄（寫「名單匯入，原日期不明」）。</p>' +
+      ((p.unknownResults || []).length ? '<div class="note" id="impUnknown"><b>' + p.unknownResults.length +
+        " 行嘅聯絡結果認唔到</b> —— 唔會自己加狀態，入做「未打」，原文照入備註記錄。逐間話我知要標咩。" +
+        list(p.unknownResults) + "</div>" : "") +
+      ((p.conflicts || []).length ? '<div class="note" id="impConflict"><b>' + p.conflicts.length +
+        " 間公司喺檔案出現兩次、兩個結果唔同</b> —— 入做「未打」，兩個原文都入備註記錄。" + list(p.conflicts) + "</div>" : "");
+  }
 
   function viewImport() {
     view().innerHTML = '<h1>匯入公司名單</h1><div class="card">' +
@@ -963,6 +988,7 @@
         $("#preview").innerHTML = '<h2>會點做</h2><div class="stats">' +
           '<div class="stat"><b>' + n.total + '</b><span>總行數</span></div><div class="stat"><b data-k="new">' + n.new + '</b><span>會入</span></div>' +
           '<div class="stat"><b>' + (n.existingName + n.existingPhone) + '</b><span>CRM 已經有</span></div><div class="stat"><b>' + (n.mergedInFile + n.noName) + '</b><span>檔內重複／冇名</span></div></div>' +
+          importStatusHtml(p) +
           '<div class="scroll"><table><thead><tr><th>檔案欄</th><th>當做</th></tr></thead><tbody>' +
           p.headers.map(function (h, i) {
             var f = p.mapping[i];

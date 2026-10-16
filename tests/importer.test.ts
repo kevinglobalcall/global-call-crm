@@ -98,6 +98,98 @@ describe("計劃（未寫入）", () => {
   });
 });
 
+describe("Kevin 個整合名單（2026-10-15 版）—— 欄名同真檔一樣", () => {
+  const H = "公司名稱,英文名／其他名稱,電話,聯絡結果,聯絡人／補充跟進,已成功Email,一般電郵,ESG電郵,中文地址／地址,傳真,行業桶\n";
+
+  it("十一個欄全部認得：英文名／其他名稱、中文地址／地址、三個電郵欄、聯絡結果、補充跟進", () => {
+    const { mapping, unmapped } = mapHeaders(H.trim().split(","));
+    expect(mapping).toEqual(["name", "name_en", "phone", "result", "followup", "email", "email", "email", "address", "fax", "industry"]);
+    expect(unmapped).toEqual([]);
+  });
+
+  it("聯絡結果：認到嘅改狀態、原文入備註；認唔到嘅唔郁（未打）、列出嚟；未核實唔當電話", async () => {
+    const table = await readTable(csv(H +
+      "鼎峰工程有限公司,,2345 0001,\"no need , emailed\",,,a@df.hk,,,,A\n" +
+      "鼎峰機械工程有限公司,,2345 0002,\"close,emailed\",,,,,,,A\n" +
+      "齊記工程有限公司,,2345 0003,\"no one answer, emailed\",Mr Wong(IT),,,,,,A\n" +
+      "VETRACKR LIMITED,,2345 0004,billing,,,,,,,B\n" +
+      "天保工程服務公司,,未核實,,,,,,,未核實,C\n" +
+      ",,,14/10,,,,,,,\n"), "x.csv");
+    const plan = planImport(table, { byName: new Map(), byPhone: new Map() });
+    const [a, b, c, d, e, marker] = plan.rows;
+    expect([a!.company.status, b!.company.status, c!.company.status, d!.company.status, e!.company.status])
+      .toEqual(["不需要", "已結業", "跟進中", undefined, undefined]);
+    expect(c!.remarks).toEqual(["no one answer, emailed", "聯絡人／補充跟進：Mr Wong(IT)"]);
+    expect(d!.remarks).toEqual(["billing"]);
+    expect(plan.unknownResults).toEqual([{ line: 5, name: "VETRACKR LIMITED", text: "billing" }]);
+    expect(plan.byStatus).toEqual({ 不需要: 1, 已結業: 1, 跟進中: 1, 未打: 2 });
+    // 「未核實」唔係認唔到嘅號碼，係冇號碼：唔出警告、唔落備註
+    expect(e!.phones).toEqual([]);
+    expect(e!.warnings.join()).not.toMatch(/未核實/);
+    expect(marker!.reason).toBe("冇公司名"); // 日子分隔行：Kevin 話唔準，唔用
+  });
+
+  it("❗同中文名但英文名唔同 ＝ 兩間公司，唔併（建輝工程公司 Kin Fai ≠ 建輝工程有限公司 Kingford）", async () => {
+    const table = await readTable(csv(H +
+      "建輝工程公司,Kin Fai Construction,9128 4073,\"no one answer, emailed\",,,,,,,C\n" +
+      "建輝工程有限公司,Kingford Engineering Limited,2396 4388,\"no need , emailed\",,,,,,,E\n" +
+      // 冇電話嗰行：電話規則幫唔到手，淨係靠英文名唔同分開
+      "建輝工程公司,Kingford Engineering Limited,,,,,,,,,E\n" +
+      "建輝工程有限公司,Kin Fai Construction Co,,,,,,,,,E\n"), "x.csv");
+    const plan = planImport(table, { byName: new Map(), byPhone: new Map() });
+    expect(plan.rows.map((r) => [r.action, r.company.status])).toEqual([["new", "跟進中"], ["new", "不需要"], ["skip", undefined], ["skip", undefined]]);
+    // 冇電話嗰兩行跟英文名歸返啱嗰間，唔會因為中文名一樣就亂併
+    expect([plan.rows[2]!.reason, plan.rows[3]!.reason]).toEqual(["檔案入面重複，併入第 3 行", "檔案入面重複，併入第 2 行"]);
+  });
+
+  it("❗名似但冇共同電話、又唔係「加有限公司」嗰種 → 兩間，出警告（祥興工程公司 vs 祥興工程有限公司）", async () => {
+    const table = await readTable(csv(H +
+      "祥興工程公司,Cheung Hing Construction Company,2436 2738,,,,,,,,A\n" +
+      "祥興工程有限公司,,2114 0500,,,,,,,,A\n"), "x.csv");
+    const plan = planImport(table, { byName: new Map(), byPhone: new Map() });
+    expect(plan.rows.map((r) => r.action)).toEqual(["new", "new"]);
+    expect(plan.rows[1]!.warnings.join()).toMatch(/同第 2 行名似但冇共同電話/);
+  });
+
+  it("上市公司簡稱 ／ 全名（信和置業 ／ 信和置業有限公司）照併；第一行未打過、第二行有結果 → 用第二行嘅", async () => {
+    const table = await readTable(csv(H +
+      "信和置業,,+852 2132 8480,,,,,,,,港股\n" +
+      "信和置業有限公司,Sino Land Company Limited,2721 8388,\"no need, emailed\",,,,,,,港股\n"), "x.csv");
+    const plan = planImport(table, { byName: new Map(), byPhone: new Map() });
+    expect(plan.rows[1]!.reason).toBe("檔案入面重複，併入第 2 行");
+    expect(plan.rows[0]!.company.status).toBe("不需要");
+    expect(plan.rows[0]!.remarks).toEqual(["no need, emailed"]);
+    expect(plan.rows[0]!.phones.map((p) => p.phone)).toEqual(["21328480", "27218388"]);
+  });
+
+  it("❗全形英文名唔可以剝剩「集團」撞埋一齊（ＧＢＡ集團 ≠ ＴＯＭ集團）", async () => {
+    // ＯＳＬ集團喺真檔冇電話 —— 電話規則幫唔到手，淨係靠個名分
+    const table = await readTable(csv(H + "ＧＢＡ集團,,2865 0078,,,,,,,,港股\nＯＳＬ集團,,,,,,,,,,港股\n"), "x.csv");
+    const plan = planImport(table, { byName: new Map(), byPhone: new Map() });
+    expect(plan.rows.map((r) => r.action)).toEqual(["new", "new"]);
+  });
+
+  it("寫入：狀態落公司、原文落備註記錄（source=import、名單匯入）", async () => {
+    const table = await readTable(csv(H +
+      "匯入甲工程有限公司,,2999 0001,\"dead, emailed\",Mr Chan,,,,,,A\n" +
+      "匯入乙工程有限公司,,2999 0002,,,,,,,,A\n"), "x.csv");
+    const plan = planImport(table, await loadExisting(t.sql));
+    await commitImport(t.sql, plan, "list.xlsx", "test", "2026-10-16");
+    const rows = await t.sql<{ name_zh: string; status: string; remarks: { body: string; source: string; author: string }[] | null }[]>`
+      select c.name_zh, c.status,
+             (select json_agg(json_build_object('body', r.body, 'source', r.source, 'author', r.author) order by r.body)
+                from public.company_remarks r where r.company_id = c.id) as remarks
+        from public.companies c where c.name_zh like '匯入%' order by c.name_zh`;
+    expect(rows).toEqual([
+      { name_zh: "匯入乙工程有限公司", status: "未打", remarks: null },
+      { name_zh: "匯入甲工程有限公司", status: "不需要", remarks: [
+        { body: "dead, emailed", source: "import", author: "名單匯入" },
+        { body: "聯絡人／補充跟進：Mr Chan", source: "import", author: "名單匯入" },
+      ] },
+    ]);
+  });
+});
+
 describe("對返 CRM", () => {
   it("❗CRM 淨係有英文名、檔案有中英文 → 一樣認得係同一間（兩條鎖匙都試）", async () => {
     await makeCompany(t.sql, { name_zh: "", name_en: "Dragon Fly Engineering Co., Ltd." });
@@ -164,7 +256,7 @@ describe("寫入", () => {
 
   it("全部都係 skip → 乜都唔寫", async () => {
     const res = await commitImport(t.sql, { headers: [], mapping: [], unmapped: [], rows: [],
-      counts: { total: 0, new: 0, mergedInFile: 0, existingName: 0, existingPhone: 0, noName: 0 } }, "x.csv");
+      counts: { total: 0, new: 0, mergedInFile: 0, existingName: 0, existingPhone: 0, noName: 0 }, byStatus: {}, unknownResults: [], conflicts: [] }, "x.csv");
     expect(res).toEqual({ created: 0, firstCode: null, lastCode: null });
   });
 });
