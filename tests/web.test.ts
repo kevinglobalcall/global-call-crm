@@ -477,6 +477,17 @@ describe("公司清單每行：直接打、記結果、改狀態、寫備註（K
     expect(d.querySelector(`[data-row="${CID2}"]`)!.classList.contains("nextup")).toBe(true);
   });
 
+  it("刪除：問一次先送；刪咗嗰行寫已刪除、總數減 1", async () => {
+    const { d, posts } = await boot("#/companies?cold=1", { "/meta": META, "/companies": (url: URL) =>
+      url.pathname.endsWith("/delete") ? { deleted: { code: "GC-00012", name: "大發物流有限公司" } } : LIST2 });
+    await tick();
+    click(d.querySelector(`[data-row="${CID}"] [data-act="del-co"]`));
+    await tick(5);
+    expect(posts().at(-1)).toMatchObject({ url: `/app/api/companies/${CID}/delete` });
+    expect(d.querySelector(`[data-row="${CID}"]`)!.textContent).toBe("已刪除 GC-00012 大發物流有限公司");
+    expect(d.querySelector("#summary b")!.textContent).toBe("0");
+  });
+
   it("加備註 POST 去嗰間；改狀態下拉即刻存", async () => {
     const { d, posts } = await page();
     await tick();

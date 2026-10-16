@@ -16,7 +16,7 @@ import {
 } from "../domain/appointments.js";
 import { deleteCall, logCall, updateCall } from "../domain/calls.js";
 import {
-  addContact, createCompany, deleteContact, emailsFromText, getCompany, listCompanies, listIndustries,
+  addContact, createCompany, deleteCompany, deleteContact, emailsFromText, getCompany, listCompanies, listIndustries,
   phonesFromText, updateCompany, updateContact, type CompanyFilters, type CompanyInput,
 } from "../domain/companies.js";
 import { companiesXlsx } from "../domain/export.js";
@@ -336,6 +336,11 @@ export function createApi(deps: { sql: () => Sql; now?: () => Date }) {
         ok({ ok: true });
         return true;
       }
+    }
+
+    if (m === "POST" && seg[0] === "companies" && seg[2] === "delete" && seg.length === 3) {
+      ok({ deleted: await deleteCompany(sql, parse(uuid, seg[1])) });
+      return true;
     }
 
     if (m === "POST" && seg[0] === "companies" && seg[2] === "remarks" && seg.length === 3) {

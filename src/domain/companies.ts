@@ -453,3 +453,37 @@ export async function deleteContact(sql: Sql, id: string, actor = "web"): Promis
              values (${actor}, 'delete_contact', 'contacts', ${id}, ${tx.json(toJson(before))})`;
   });
 }
+
+// ── 刪除（Kevin 2026-10-16「加個刪除」—— 匯入名單有孖生，同一個電話幾張卡）──────────────
+/**
+ * 真刪除，但**有電話記錄或者約見面嘅唔准刪**：所有子表都係 on delete cascade，
+ * 刪咗佢啲 calls 會靜靜雞令以前嗰幾日嘅每日數變細。嗰啲改狀態（不需要／已結業）就得。
+ * 刪之前成張卡（連電話、電郵、聯絡人、備註）寫落 audit_log，唔小心刪錯仲搵得返。
+ */
+export async function deleteCompany(sql: Sql, id: string, actor = "web"): Promise<{ code: string; name: string }> {
+  return sql.begin(async (tx) => {
+    const [c] = await tx<{ id: string; code: string; name_zh: string | null; name_en: string | null }[]>`
+      select * from public.companies where id = ${id} for update`;
+    if (!c) throw new Error("搵唔到呢間公司（可能已經刪咗）");
+    const [n] = await tx<{ calls: number; appts: number }[]>`
+      select (select count(*)::int from public.calls where company_id = ${id}) as calls,
+             (select count(*)::int from public.appointments where company_id = ${id}) as appts`;
+    if (n!.calls || n!.appts) {
+      const bits = [n!.calls ? `${n!.calls} 次電話記錄` : "", n!.appts ? `${n!.appts} 個約見面` : ""].filter(Boolean).join("、");
+      throw new Error(`${c.code} 有 ${bits}，刪咗連以前嘅每日數都會變 —— 唔刪得。唔想再見佢就改狀態做「不需要」或者「已結業」。`);
+    }
+    const [phones, emails, contacts, remarks, tasks] = await Promise.all([
+      tx`select phone, label, raw from public.company_phones where company_id = ${id}`,
+      tx`select email from public.company_emails where company_id = ${id}`,
+      tx`select name, title, phone, email, notes from public.contacts where company_id = ${id}`,
+      tx`select body, author, source, created_at from public.company_remarks where company_id = ${id}`,
+      tx`select kind, status, note, due_at from public.tasks where company_id = ${id}`,
+    ]);
+    await tx`delete from public.companies where id = ${id}`;
+    await tx`insert into public.audit_log (actor, action, table_name, record_id, before)
+             values (${actor}, 'delete_company', 'companies', ${id},
+                     ${tx.json(toJson({ company: c, phones, emails, contacts, remarks, tasks }))})`;
+    return { code: c.code, name: c.name_zh || c.name_en || "" };
+  });
+}
+

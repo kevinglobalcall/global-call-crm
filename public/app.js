@@ -438,7 +438,8 @@
     return '<div class="cmain">' +
       '<div class="spread"><a class="name" href="#/c/' + esc(c.id) + '">' + esc(nameOf(c)) +
       (altName(c) ? ' <span class="muted small">' + esc(altName(c)) + "</span>" : "") + "</a>" +
-      '<span class="small muted">' + esc(c.code) + "</span></div>" +
+      '<span class="row small"><span class="muted">' + esc(c.code) + "</span>" +
+      '<button type="button" class="btn sm danger" data-act="del-co">刪除</button></span></div>' +
       '<div class="dials">' + rowPhones(c) + "</div>" +
       (emails.length ? '<div class="small">' + emails.map(function (e) { return '<a href="mailto:' + esc(e) + '">' + esc(e) + "</a>"; }).join(" · ") + "</div>" : "") +
       '<div class="row small"><select class="stsel" data-act="status" aria-label="狀態">' +
@@ -573,6 +574,18 @@
         api("/calls/" + b.getAttribute("data-call") + "/delete", {}).then(function () {
           toast("撤回咗");
           return refresh(row, "撤回咗");
+        }).catch(function (er) { toast(er.message, true); });
+        return;
+      }
+      if (act === "del-co") {
+        var co = ROWS[id];
+        if (!confirm("刪除「" + nameOf(co) + "」（" + co.code + "）？\n佢嘅電話、電郵、備註會一齊刪，冇得返轉頭。\n（有電話記錄嘅唔刪得，改狀態就得）")) return;
+        api("/companies/" + id + "/delete", {}).then(function (r) {
+          toast("刪咗 " + r.deleted.code + " " + r.deleted.name);
+          row.classList.add("gone");
+          row.innerHTML = '<div class="small muted">已刪除 ' + esc(r.deleted.code + " " + r.deleted.name) + "</div>";
+          var tot = $("#summary b");
+          if (tot && Number(tot.textContent) > 0) tot.textContent = String(Number(tot.textContent) - 1);
         }).catch(function (er) { toast(er.message, true); });
         return;
       }
@@ -831,6 +844,8 @@
         emailsText: d.emails.map(function (e) { return e.email; }).join(" / "), customer_type: c.customer_type,
         status: c.status, followed_by: c.followed_by,
       }, true) + '<button class="btn primary" id="coSave">存</button><div id="coErr" class="err" hidden></div></details>' +
+        '<div class="row" style="margin-top:8px"><button class="btn sm danger" id="coDelete">刪除呢間公司</button>' +
+        '<span class="small muted">有電話記錄或者約見面嘅唔刪得（改狀態就得）</span></div>' +
         (c.source ? '<div class="small muted">來源：' + esc(c.source) + "</div>" : "") + "</div>";
 
       view().innerHTML = html;
@@ -901,6 +916,14 @@
           name: $("#ctName").value.trim(), title: $("#ctTitle").value.trim() || null, phone: $("#ctPhone").value.trim() || null,
           email: $("#ctEmail").value.trim() || null, is_decision_maker: $("#ctDM").checked,
         }).then(function () { toast("加咗聯絡人"); render(); }).catch(function (er) { toast(er.message, true); });
+      });
+      $("#coDelete").addEventListener("click", function () {
+        if (!confirm("刪除「" + nameOf(c) + "」（" + c.code + "）？\n佢嘅電話、電郵、聯絡人、備註會一齊刪，冇得返轉頭。")) return;
+        api("/companies/" + c.id + "/delete", {}).then(function (r) {
+          toast("刪咗 " + r.deleted.code + " " + r.deleted.name);
+          meta(true);
+          location.hash = "#/companies";
+        }).catch(function (er) { toast(er.message, true); });
       });
       $("#coSave").addEventListener("click", function () {
         var body = readCompanyForm(view(), true);
