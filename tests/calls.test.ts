@@ -99,6 +99,22 @@ describe("記電話", () => {
     expect(tasks).toEqual([{ status: "待辦" }]);              // 舊回撥冇被收
   });
 
+  it("❗DB 收晒網頁畀撳嘅每一粒結果（包括第九粒「留聯絡」）—— 唔係撳咗爆 DB 錯", async () => {
+    const { OUTCOMES } = await import("../src/domain/outcomes.js");
+    for (const o of OUTCOMES) {
+      const id = await makeCompany(t.sql);
+      const r = await logCall(t.sql, {
+        companyId: id, outcome: o,
+        ...(o === "幾點鐘再打" ? { callbackAt: new Date("2026-10-20T07:00:00Z") } : {}),
+        ...(o === "其他人跟進" ? { otherFollower: "阿明" } : {}),
+      });
+      expect([o, r.call.outcome]).toEqual([o, o]);
+    }
+    const id = await makeCompany(t.sql);
+    const r = await logCall(t.sql, { companyId: id, outcome: "留聯絡", content: "留咗電話畀前台" });
+    expect(r).toMatchObject({ statusAfter: "跟進中", connected: true, task: null });
+  });
+
   it("每次記錄都入 audit_log", async () => {
     const id = await makeCompany(t.sql);
     const r = await logCall(t.sql, { companyId: id, outcome: "不需要" }, "mcp");

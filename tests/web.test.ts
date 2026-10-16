@@ -16,6 +16,7 @@ const OUTCOME_RULES = [
   ["稍後再撥打", true, "回撥", "optional", null], ["需要跟進", true, "跟進", "optional", null],
   ["只接受電郵", true, "寄電郵", "optional", null], ["已電郵", true, null, "optional", null],
   ["其他人跟進", true, null, "none", "其他人跟進"], ["幾點鐘再打", true, "回撥", "required", null],
+  ["留聯絡", true, null, "optional", null],
 ] as const;
 
 const META = {
@@ -174,7 +175,7 @@ describe("公司頁：記電話", () => {
     expect([...d.querySelectorAll("a.dial")].map((a) => a.textContent!.trim())).toEqual(["2345 6789"]);
     expect(d.body.textContent).toContain("傳真 2345 6790");
     expect((d.querySelector("#attempt") as HTMLInputElement).value).toBe("3");
-    expect(d.querySelectorAll("[data-outcome]").length).toBe(8);
+    expect(d.querySelectorAll("[data-outcome]").length).toBe(9);
     expect([...d.querySelectorAll("[data-outcome]")].map((b) => b.textContent)).toEqual(OUTCOME_RULES.map((r) => r[0]));
     expect((d.querySelector("#save") as HTMLButtonElement).disabled).toBe(true);
     // 興趣產品：server 話有嗰隻亮咗
@@ -411,7 +412,7 @@ describe("公司清單每行：直接打、記結果、改狀態、寫備註（K
     expect(r.querySelector('a[href="mailto:info@taifat.hk"]')).toBeTruthy();
     expect((r.querySelector('[data-act="status"]') as HTMLSelectElement).value).toBe("未打");
     expect(r.querySelector(".lastnote")!.textContent).toBe("名單匯入 no one answer, emailed");
-    expect(r.querySelectorAll('[data-act="out"]').length).toBe(8);
+    expect(r.querySelectorAll('[data-act="out"]').length).toBe(9);
   });
 
   it("撳「沒有人接」→ 即刻記電話：帶公司、第 1 次、格入面啲字做內容", async () => {

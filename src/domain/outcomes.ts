@@ -1,6 +1,7 @@
 /**
- * 打完電話嘅八粒結果掣 —— Kevin 張單，一個都唔改、次序都唔改：
+ * 打完電話嘅結果掣 —— Kevin 張單嘅八粒，一個都唔改、次序都唔改：
  *   沒有人接 · 不需要 · 稍後再撥打 · 需要跟進 · 只接受電郵 · 已電郵 · 其他人跟進 · 幾點鐘再打
+ * ＋ 第九粒「留聯絡」（Kevin 2026-10-16「加一個按鈕 留聯絡」）—— 加喺最尾，前面八粒次序唔郁。
  *
  * 每粒掣三樣嘢要講清楚：
  *   1. 算唔算「接通」（每日數）
@@ -19,6 +20,7 @@ export const OUTCOMES = [
   "已電郵",
   "其他人跟進",
   "幾點鐘再打",
+  "留聯絡",
 ] as const;
 
 export type Outcome = (typeof OUTCOMES)[number];
@@ -74,6 +76,11 @@ export const RULES: Record<Outcome, OutcomeRule> = {
     connected: true, task: "回撥", time: "required", status: null,
     hint: "一定要揀時間，到時出喺今日回撥。",
   },
+  // 有人聽（前台／秘書），留低咗聯絡等佢覆 —— 接通照 Kevin 嘅定義（唔係「沒有人接」就算）
+  "留聯絡": {
+    connected: true, task: null, time: "optional", status: null,
+    hint: "留低咗聯絡等佢覆。想約時間再打就揀個時間（會開回撥）；唔揀就留喺冷電名單。",
+  },
 };
 
 export function isOutcome(x: unknown): x is Outcome {
@@ -88,6 +95,7 @@ export function isOutcome(x: unknown): x is Outcome {
 export function taskFor(outcome: Outcome, hasTime: boolean): TaskKind | null {
   if (outcome === "沒有人接") return hasTime ? "回撥" : null;
   if (outcome === "已電郵") return hasTime ? "跟進" : null;
+  if (outcome === "留聯絡") return hasTime ? "回撥" : null;
   return RULES[outcome].task;
 }
 

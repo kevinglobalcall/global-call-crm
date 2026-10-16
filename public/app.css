@@ -242,3 +242,5 @@ td.num a { font-weight: 600; }
 .themebtn svg { width: 16px; height: 16px; }
 .themebtn:hover { background: rgba(255,255,255,.1); }
 @media (max-width: 720px) { .themebtn { margin-left: auto; } }
+/* 九粒結果掣：清單度「加備註」自己成行，唔好孤零零喺第四行一粒 */
+.qouts .addnote { grid-column: 1 / -1; }

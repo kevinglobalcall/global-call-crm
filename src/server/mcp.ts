@@ -32,7 +32,7 @@ import { addDays, fmtHk, hkToday, parseHkDateTime } from "../lib/time.js";
 
 const INSTRUCTIONS = [
   "Kevin（Global Call 電訊 B2B 銷售）嘅冷電 CRM。用廣東話覆。",
-  "記電話：log_call。結果一定係以下八個之一：" + OUTCOMES.join("、") + "。",
+  "記電話：log_call。結果一定係以下其中一個：" + OUTCOMES.join("、") + "。",
   "「幾點鐘再打」一定要有 callbackAt；「其他人跟進」一定要有 otherFollower（邊個同事）；「不需要」同「其他人跟進」唔可以有 callbackAt。",
   "R ＝ 搵到負責人（reachedR）。D ＝ 攞到詳盡資料：合約到期日、而家價錢、套餐內容、用緊邊個台（dContractEnd／dPrice／dPlan／dProvider，填咗任何一樣就自動算 D）。R、D 分開判斷：前台講咗合約到期日算 D 唔算 R。",
   "時間一律香港時間，寫「2026-10-20 15:00」。相對日子（聽日、下星期二）要由 today_stats 回嘅 today 計，覆 Kevin 嗰陣日期同星期一齊寫。",
@@ -196,7 +196,7 @@ export function buildMcpServer(getSql: () => Sql, now: () => Date = () => new Da
 
   server.registerTool("log_call", {
     title: "記低一次電話",
-    description: "打完一次電話記低：結果（八揀一）、內容、R／D、D 資料、回撥時間。會自動收舊回撥、按規則開新回撥、改公司狀態。",
+    description: "打完一次電話記低：結果（揀一個）、內容、R／D、D 資料、回撥時間。會自動收舊回撥、按規則開新回撥、改公司狀態。",
     inputSchema: {
       company: z.string().describe("GC-00012、id 或者名（名要搜到唯一一間）"),
       outcome: z.enum(OUTCOMES),
