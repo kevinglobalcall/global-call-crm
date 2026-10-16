@@ -119,7 +119,7 @@
     return k(c.name_zh) === k(c.name_en) ? "" : c.name_en;
   }
   function statusPill(s) {
-    var cls = { "未打": "", "跟進中": "acc", "不需要": "bad", "其他人跟進": "warn", "已成交": "ok", "已結業": "bad" }[s] || "";
+    var cls = { "未打": "", "跟進中": "acc", "不需要": "bad", "唔通": "bad", "其他人跟進": "warn", "已成交": "ok", "已結業": "bad" }[s] || "";
     return '<span class="pill ' + cls + '">' + esc(s) + "</span>";
   }
   function rd(r, d) {
@@ -790,7 +790,7 @@
   function callHtml(k) {
     var dBits = [k.d_provider, k.d_contract_end ? "約滿 " + k.d_contract_end : "", k.d_price, k.d_plan].filter(Boolean);
     return '<div class="call" data-call="' + esc(k.id) + '"><div class="spread"><span><b>' + esc(fmt(k.called_at)) + "</b> 第 " + k.attempt_no + " 次 " +
-      '<span class="pill ' + (k.outcome === "沒有人接" ? "" : "acc") + '">' + esc(k.outcome) + "</span> " + rd(k.reached_r, k.got_d) + "</span>" +
+      '<span class="pill ' + (k.outcome === "沒有人接" ? "" : k.outcome === "唔通" ? "bad" : "acc") + '">' + esc(k.outcome) + "</span> " + rd(k.reached_r, k.got_d) + "</span>" +
       '<span class="row"><button class="btn sm" data-act="edit">改</button><button class="btn sm danger" data-act="del">刪</button></span></div>' +
       (k.callback_at ? '<div class="small muted">約咗 ' + esc(fmt(k.callback_at)) + "</div>" : "") +
       (k.other_follower ? '<div class="small">同事：' + esc(k.other_follower) + "</div>" : "") +
@@ -1096,7 +1096,7 @@
             '<span class="small muted">' + esc(r.code) + "</span></div>" +
             '<div class="row small"><b>' + esc(fmt(r.at)) + "</b>" +
             (r.attempt_no ? ' <span class="muted">第 ' + r.attempt_no + " 次</span>" : "") +
-            ' <span class="pill ' + (r.tag === "沒有人接" ? "" : "acc") + '">' + esc(r.tag) + "</span>" +
+            ' <span class="pill ' + (r.tag === "沒有人接" ? "" : r.tag === "唔通" ? "bad" : "acc") + '">' + esc(r.tag) + "</span>" +
             (appt ? "" : " " + rd(r.reached_r, r.got_d)) +
             (r.extra ? ' <span class="muted">' + esc(appt ? r.extra : "D：" + r.extra) + "</span>" : "") + "</div>" +
             (r.text ? '<div class="small pre">' + esc(r.text) + "</div>" : "") + "</a>";

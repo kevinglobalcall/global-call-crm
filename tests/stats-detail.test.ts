@@ -49,6 +49,21 @@ describe("每日數 → 撳入去睇係邊幾間", () => {
     expect(connected.map((x) => x.tag)).toEqual(["需要跟進", "不需要", "需要跟進"]); // 冇「沒有人接」，新嘅行先
   });
 
+  it("❗「唔通」唔算接通（格同撳入去嘅清單都係）；公司轉「唔通」，唔再出冷電名單", async () => {
+    const { listCompanies } = await import("../src/domain/companies.js");
+    const a = await makeCompany(t.sql), b = await makeCompany(t.sql);
+    const r = await logCall(t.sql, { companyId: a, outcome: "唔通", calledAt: hk("2030-02-03T10:00") });
+    expect(r).toMatchObject({ statusAfter: "唔通", connected: false, task: null });
+    await logCall(t.sql, { companyId: b, outcome: "不需要", calledAt: hk("2030-02-03T11:00") });
+    const [s] = await dailyStats(t.sql, "2030-02-03", "2030-02-03");
+    expect([s!.calls, s!.connected]).toEqual([2, 1]);
+    expect((await statsDetail(t.sql, "connected", "2030-02-03", "2030-02-03")).map((x) => x.company_id)).toEqual([b]);
+    const cold = await listCompanies(t.sql, { cold: true }, 500, 0);
+    expect(cold.rows.map((x) => x.id)).not.toContain(a);
+    const noLine = await listCompanies(t.sql, { status: ["唔通"] }, 500, 0);
+    expect(noLine.rows.map((x) => x.id)).toContain(a);
+  });
+
   it("日子亂寫／倒轉 → 錯", async () => {
     await expect(statsDetail(t.sql, "calls", "2030-02-30", "2030-03-01")).rejects.toThrow();
     await expect(statsDetail(t.sql, "calls", "2030-03-02", "2030-03-01")).rejects.toThrow(/開始日喺完結日之後/);

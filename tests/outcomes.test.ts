@@ -8,7 +8,7 @@ import { nextStatus, OUTCOMES, RULES, taskFor, validateCall, isOutcome } from ".
 describe("八粒掣", () => {
   it("名同次序照 Kevin 張單，一個都唔改；第九粒「留聯絡」加喺最尾", () => {
     expect([...OUTCOMES]).toEqual([
-      "沒有人接", "不需要", "稍後再撥打", "需要跟進", "只接受電郵", "已電郵", "其他人跟進", "幾點鐘再打", "留聯絡",
+      "沒有人接", "不需要", "稍後再撥打", "需要跟進", "只接受電郵", "已電郵", "其他人跟進", "幾點鐘再打", "留聯絡", "唔通",
     ]);
   });
 
@@ -24,6 +24,7 @@ describe("八粒掣", () => {
       ["其他人跟進", true, null, "none", "其他人跟進"],
       ["幾點鐘再打", true, "回撥", "required", null],
       ["留聯絡", true, null, "optional", null],
+      ["唔通", false, null, "none", "唔通"],
     ]);
   });
 

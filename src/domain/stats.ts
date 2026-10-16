@@ -3,7 +3,7 @@
  *
  * 計法（Kevin 可以改，改呢度一個位）：
  *   · 通數 ＝ 打咗幾多次（每撥一次算一次）
- *   · 接通 ＝ 結果唔係「沒有人接」嘅次數
+ *   · 接通 ＝ 結果唔係「沒有人接」／「唔通」嘅次數（outcomes.ts 個 NOT_CONNECTED）
  *   · R    ＝ 當日有幾多**間公司**搵到負責人（同一間一日打兩次都係 1）
  *   · D    ＝ 當日有幾多**間公司**攞到詳盡資料
  * R、D 按間數唔按次數：上晝傾到負責人、下晝再打又傾到，唔應該報兩個 R。
@@ -14,6 +14,7 @@
  */
 
 import type { Sql } from "../db/client.js";
+import { NOT_CONNECTED } from "./outcomes.js";
 import { addDays, assertDay, hkDayStart, hkToday } from "../lib/time.js";
 
 export interface DayStats {
@@ -36,7 +37,7 @@ export async function dailyStats(sql: Sql, from: string, to: string): Promise<Da
   const rows = await sql<Omit<DayStats, "booked" | "met">[]>`
     select (called_at at time zone 'Asia/Hong_Kong')::date::text                as day,
            count(*)::int                                                       as calls,
-           count(*) filter (where outcome <> '沒有人接')::int                   as connected,
+           count(*) filter (where outcome not in ${sql(NOT_CONNECTED)})::int                   as connected,
            count(distinct company_id) filter (where reached_r)::int            as r,
            count(distinct company_id) filter (where got_d)::int                as d
       from public.calls
@@ -77,7 +78,7 @@ export async function periodTotals(sql: Sql, from: string, to: string): Promise<
   const end = hkDayStart(addDays(to, 1));
   const [row] = await sql<Omit<DayStats, "day">[]>`
     select count(*)::int                                                       as calls,
-           count(*) filter (where outcome <> '沒有人接')::int                   as connected,
+           count(*) filter (where outcome not in ${sql(NOT_CONNECTED)})::int                   as connected,
            count(distinct company_id) filter (where reached_r)::int            as r,
            count(distinct company_id) filter (where got_d)::int                as d,
            (select count(*)::int from public.appointments
@@ -130,7 +131,7 @@ export async function statsDetail(sql: Sql, kind: DetailKind, from: string, to: 
                k.reached_r, k.got_d, k.content as text, ${dInfo} as extra
           from public.calls k join public.companies c on c.id = k.company_id
          where k.called_at >= ${start} and k.called_at < ${end}
-           ${kind === "connected" ? sql`and k.outcome <> '沒有人接'` : sql``}
+           ${kind === "connected" ? sql`and k.outcome not in ${sql(NOT_CONNECTED)}` : sql``}
          order by k.called_at desc`;
     case "r":
     case "d": {

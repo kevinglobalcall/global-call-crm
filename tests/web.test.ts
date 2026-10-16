@@ -16,13 +16,13 @@ const OUTCOME_RULES = [
   ["稍後再撥打", true, "回撥", "optional", null], ["需要跟進", true, "跟進", "optional", null],
   ["只接受電郵", true, "寄電郵", "optional", null], ["已電郵", true, null, "optional", null],
   ["其他人跟進", true, null, "none", "其他人跟進"], ["幾點鐘再打", true, "回撥", "required", null],
-  ["留聯絡", true, null, "optional", null],
+  ["留聯絡", true, null, "optional", null], ["唔通", false, null, "none", "唔通"],
 ] as const;
 
 const META = {
   today: "2026-10-14",
   outcomes: OUTCOME_RULES.map(([outcome, connected, task, time, status]) => ({ outcome, connected, task, time, status, hint: `${outcome}嘅說明` })),
-  statuses: ["未打", "跟進中", "不需要", "其他人跟進", "已成交", "已結業"],
+  statuses: ["未打", "跟進中", "不需要", "唔通", "其他人跟進", "已成交", "已結業"],
   products: [{ id: "11111111-1111-1111-1111-111111111111", name: "SME Bundle — Business Connect" },
              { id: "22222222-2222-2222-2222-222222222222", name: "NB-IoT／工業 SIM" }],
   industries: [{ industry: "物流", n: 12 }],
@@ -175,7 +175,7 @@ describe("公司頁：記電話", () => {
     expect([...d.querySelectorAll("a.dial")].map((a) => a.textContent!.trim())).toEqual(["2345 6789"]);
     expect(d.body.textContent).toContain("傳真 2345 6790");
     expect((d.querySelector("#attempt") as HTMLInputElement).value).toBe("3");
-    expect(d.querySelectorAll("[data-outcome]").length).toBe(9);
+    expect(d.querySelectorAll("[data-outcome]").length).toBe(10);
     expect([...d.querySelectorAll("[data-outcome]")].map((b) => b.textContent)).toEqual(OUTCOME_RULES.map((r) => r[0]));
     expect((d.querySelector("#save") as HTMLButtonElement).disabled).toBe(true);
     // 興趣產品：server 話有嗰隻亮咗
@@ -444,7 +444,7 @@ describe("公司清單每行：直接打、記結果、改狀態、寫備註（K
     expect(r.querySelector('a[href="mailto:info@taifat.hk"]')).toBeTruthy();
     expect((r.querySelector('[data-act="status"]') as HTMLSelectElement).value).toBe("未打");
     expect(r.querySelector(".lastnote")!.textContent).toBe("名單匯入 no one answer, emailed");
-    expect(r.querySelectorAll('[data-act="out"]').length).toBe(9);
+    expect(r.querySelectorAll('[data-act="out"]').length).toBe(10);
   });
 
   it("顯示所有備註（Kevin：顯示所有備註）：每條一行，電話出第幾次同結果", async () => {

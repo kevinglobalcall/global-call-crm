@@ -2,6 +2,8 @@
  * 打完電話嘅結果掣 —— Kevin 張單嘅八粒，一個都唔改、次序都唔改：
  *   沒有人接 · 不需要 · 稍後再撥打 · 需要跟進 · 只接受電郵 · 已電郵 · 其他人跟進 · 幾點鐘再打
  * ＋ 第九粒「留聯絡」（Kevin 2026-10-16「加一個按鈕 留聯絡」）—— 加喺最尾，前面八粒次序唔郁。
+ * ＋ 第十粒「唔通」（Kevin 2026-10-16「加個唔通按鈕」）：電話打唔通（死線／錯號），唔算接通，
+ *   公司轉新狀態「唔通」（佢揀嘅：「轉 唔通」）—— 唔再出冷電名單，但篩得返出嚟（例如搵第二個號）。
  *
  * 每粒掣三樣嘢要講清楚：
  *   1. 算唔算「接通」（每日數）
@@ -21,11 +23,12 @@ export const OUTCOMES = [
   "其他人跟進",
   "幾點鐘再打",
   "留聯絡",
+  "唔通",
 ] as const;
 
 export type Outcome = (typeof OUTCOMES)[number];
 
-export const COMPANY_STATUSES = ["未打", "跟進中", "不需要", "其他人跟進", "已成交", "已結業"] as const;
+export const COMPANY_STATUSES = ["未打", "跟進中", "不需要", "唔通", "其他人跟進", "已成交", "已結業"] as const;
 export type CompanyStatus = (typeof COMPANY_STATUSES)[number];
 
 export type TaskKind = "回撥" | "跟進" | "寄電郵" | "到期提醒" | "其他";
@@ -81,7 +84,14 @@ export const RULES: Record<Outcome, OutcomeRule> = {
     connected: true, task: null, time: "optional", status: null,
     hint: "留低咗聯絡等佢覆。想約時間再打就揀個時間（會開回撥）；唔揀就留喺冷電名單。",
   },
+  "唔通": {
+    connected: false, task: null, time: "none", status: "唔通",
+    hint: "電話打唔通（死線／錯號）。間公司轉「唔通」，唔再出冷電名單；篩「唔通」搵得返。",
+  },
 };
+
+/** 唔算「接通」嘅結果（沒有人接、唔通）—— 每日數 SQL 用呢個，唔好喺 SQL 寫死 */
+export const NOT_CONNECTED: Outcome[] = OUTCOMES.filter((o) => !RULES[o].connected);
 
 export function isOutcome(x: unknown): x is Outcome {
   return typeof x === "string" && (OUTCOMES as readonly string[]).includes(x);
