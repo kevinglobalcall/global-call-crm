@@ -2,7 +2,8 @@
  * 備註記錄（Remark Record）—— 對真 Postgres（真 migration）。
  */
 import { describe, expect, it } from "vitest";
-import { getCompany } from "../src/domain/companies.js";
+import { logCall } from "../src/domain/calls.js";
+import { getCompany, listCompanies } from "../src/domain/companies.js";
 import { addRemark, deleteRemark, listRemarks } from "../src/domain/remarks.js";
 import { makeCompany, useTestDb } from "./helpers/db.js";
 
@@ -94,5 +95,27 @@ describe("全站搜尋（Kevin 2026-10-16「全部頁面都要加全站search」
     expect(await hit("9123 45")).toContain(id);
     expect(await hit("kenneth@sustain")).toContain(id);
     expect(await hit("Kenneth Lee")).not.toContain(id);
+  });
+});
+
+describe("搜尋搵到備註記錄（Kevin 2026-10-16「備註記錄 也要search到出來」）", () => {
+  it("手寫備註、名單匯入備註、電話內容都搜到；無視空格大細楷；電話號碼寫喺備註都得；唔中嘅唔出", async () => {
+    const a = await makeCompany(t.sql);
+    const b = await makeCompany(t.sql);
+    const c = await makeCompany(t.sql);
+    const none = await makeCompany(t.sql);
+    await addRemark(t.sql, a, "前台話 Kelvin 去咗旅行，下星期再打");
+    await t.sql`insert into public.company_remarks (company_id, body, author, source) values (${b}, '漢基 9771 3311 call me tmr', '名單匯入', 'import')`;
+    await logCall(t.sql, { companyId: c, outcome: "需要跟進", content: "IT Manager Bosco 話年尾約滿" });
+    const ids = async (q: string) => (await listCompanies(t.sql, { q }, 50)).rows.map((r) => r.id);
+    expect(await ids("kelvin去咗旅行")).toEqual([a]);
+    expect(await ids("CALL ME TMR")).toEqual([b]);
+    expect(await ids("97713311")).toEqual([b]);
+    expect(await ids("年尾約滿")).toEqual([c]);
+    expect(await ids("bosco")).toEqual([c]);
+    expect(await ids("去咗旅行")).not.toContain(none);
+    // 篩選照樣疊得上：冷電名單 ＋ 備註字
+    await t.sql`update public.companies set status = '不需要' where id = ${a}`;
+    expect((await listCompanies(t.sql, { q: "kelvin去咗旅行", cold: true }, 50)).total).toBe(0);
   });
 });

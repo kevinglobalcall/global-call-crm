@@ -190,6 +190,11 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
 - 頁頭一格（任何頁都有）：打字 250ms 後搵頭 8 間（`/companies?q=&limit=8`）下拉；撳一間入公司頁；Enter → 公司清單；
   Esc／撳出面收；任何頁撳「/」跳去格度。手機頁頭得 logo＋搜尋＋深淺色（CRM 字同「深色」兩個字收埋）。
 - 搜尋（`where()` 個 q）而家連**聯絡人**名／電郵／電話都搵（公司頁同清單一齊受惠）。
+- **備註記錄都搵**（Kevin「備註記錄 也要search到出來」）：手寫／名單匯入備註（`company_remarks.body`）＋電話內容
+  （`calls.content`），無視空格大細楷，寫喺備註嘅電話號碼都搵到。❗寫成 `o.id in (select … union select …)`，
+  唔好逐行 `exists`：本機 11,803 間實測逐行 exists 每次搜尋 1.0 → 1.55 秒，`in` 返返 1.0 秒。
+  ❗**唔搵 `companies.notes`**：嗰格係匯入嘅「分類：…／【原欄】SIM／IoT 切入點…」，搜「esg」「IoT」會中幾千間，
+  而且清單行度唔出嗰格，Kevin 會見到一堆唔知點解中嘅公司。
 - ❗**SQL 寫喺 JS template literal 入面唔准用 `\D` 呢類反斜線**：`sql\`…'\D'…\`` 喺 JS 變咗 `'D'`（唔識嘅 escape 靜靜雞食咗），
   regex 由「非數字」變咗「字母 D」，tsc 同 test 都唔會出聲 —— 我第一版就係噉，靠 node 試一下先捉到。用 `[^0-9]`。
 

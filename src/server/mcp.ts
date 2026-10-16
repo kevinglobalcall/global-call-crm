@@ -142,7 +142,7 @@ export function buildMcpServer(getSql: () => Sql, now: () => Date = () => new Da
 
   server.registerTool("search_company", {
     title: "搵公司",
-    description: "用名（中英文都得，無視空格）、電話、電郵、編號搵公司。cold=true 淨係出冷電名單（未打／跟進中、冇同事跟開）。",
+    description: "用名（中英文都得，無視空格）、電話、電郵、編號、聯絡人、備註記錄同電話內容搵公司。cold=true 淨係出冷電名單（未打／跟進中、冇同事跟開）。",
     inputSchema: {
       q: z.string().optional(), cold: z.boolean().optional(),
       status: z.array(z.enum(COMPANY_STATUSES)).optional(),

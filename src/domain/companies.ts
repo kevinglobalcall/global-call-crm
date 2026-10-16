@@ -98,6 +98,10 @@ function where(sql: Sql, f: CompanyFilters) {
       or public.nospace(o.name_en) like ${key}
       or public.nospace(o.code)    like ${key}
       or public.nospace(o.emails)  like ${key}
+      -- 備註記錄都要搵得到（Kevin 2026-10-16「備註記錄 也要search到出來」）：手寫／匯入備註＋每次電話內容
+      -- 先搵出命中嘅公司 id（hashed subplan）—— 寫成逐行 exists 會令每次搜尋慢多半秒
+      or o.id in (select rm.company_id from public.company_remarks rm where public.nospace(rm.body) like ${key}
+                  union select kc.company_id from public.calls kc where public.nospace(kc.content) like ${key})
       or exists (select 1 from public.contacts ct where ct.company_id = o.id
                     and (public.nospace(ct.name) like ${key} or public.nospace(ct.email) like ${key}
                          ${digits.length >= 4 ? sql`or regexp_replace(coalesce(ct.phone, ''), '[^0-9]', '', 'g') like ${`%${digits}%`}` : sql``}))
