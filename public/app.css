@@ -244,3 +244,7 @@ td.num a { font-weight: 600; }
 @media (max-width: 720px) { .themebtn { margin-left: auto; } }
 /* 九粒結果掣：清單度「加備註」自己成行，唔好孤零零喺第四行一粒 */
 .qouts .addnote { grid-column: 1 / -1; }
+
+/* 清單備註欄顯示晒：一條一行，太長就喺格入面捲，唔好成行拉到好長 */
+.lastnote { max-height: 168px; overflow-y: auto; }
+.lastnote .nline + .nline { margin-top: 3px; padding-top: 3px; border-top: 1px dashed var(--line); }

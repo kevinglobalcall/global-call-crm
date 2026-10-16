@@ -433,6 +433,17 @@
     return '<b class="small">' + esc(head) + "</b> " + esc(n.text);
   }
 
+  /** 全部備註（新嘅行先）；未有就講未有 */
+  function notesHtml(c) {
+    var list = c.history || (c.last_note ? [c.last_note] : []);
+    if (!list.length) return '<span class="muted">未有備註</span>';
+    return list.map(function (n) {
+      var head = n.kind === "import" ? "名單匯入" :
+        fmt(n.at) + (n.kind === "call" ? " · 第 " + (n.attempt_no || "?") + " 次 · " + (n.outcome || "") : n.author ? " · " + n.author : "");
+      return '<div class="nline"><b class="small">' + esc(head) + "</b>" + (n.text ? " " + esc(n.text) : "") + "</div>";
+    }).join("");
+  }
+
   function crowInner(c, m) {
     var emails = (c.emails || "").split(" / ").filter(Boolean);
     return '<div class="cmain">' +
@@ -451,7 +462,7 @@
       (c.mis_checked ? "" : ' <span class="pill">MIS 未查</span>') + "</div>" +
       '<div class="followbox" hidden><input type="text" data-v="follower" placeholder="邊個同事跟緊（可以留空）">' +
       '<button class="btn sm primary" data-act="follow-save">存</button></div></div>' +
-      '<div class="cact"><div class="lastnote small">' + lastNoteHtml(c.last_note) + "</div>" +
+      '<div class="cact"><div class="lastnote small">' + notesHtml(c) + "</div>" +
       '<textarea data-v="note" rows="1" placeholder="備註／今次電話講咗乜"></textarea>' +
       '<div class="qouts">' + m.outcomes.map(function (o) {
         return '<button type="button" data-act="out" data-o="' + esc(o.outcome) + '">' + esc(o.outcome) + "</button>";

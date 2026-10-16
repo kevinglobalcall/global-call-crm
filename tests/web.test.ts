@@ -415,6 +415,23 @@ describe("公司清單每行：直接打、記結果、改狀態、寫備註（K
     expect(r.querySelectorAll('[data-act="out"]').length).toBe(9);
   });
 
+  it("顯示所有備註（Kevin：顯示所有備註）：每條一行，電話出第幾次同結果", async () => {
+    const withHist = { ...LIST2, rows: [{ ...ROW, history: [
+      { kind: "remark", text: "enquire@kwcml.com", at: "2026-10-16T03:44:00.000Z", author: "Kevin", outcome: null, attempt_no: null },
+      { kind: "call", text: null, at: "2026-10-16T03:35:00.000Z", author: null, outcome: "沒有人接", attempt_no: 1 },
+      { kind: "remark", text: "28808224 mr.lau", at: "2026-10-16T03:30:00.000Z", author: "Kevin", outcome: null, attempt_no: null },
+      { kind: "import", text: "no one answer, emailed", at: null, author: "名單匯入", outcome: null, attempt_no: null },
+    ] }] };
+    const { d } = await boot("#/companies?cold=1", { "/meta": META, "/companies": withHist });
+    await tick();
+    expect([...d.querySelectorAll(`[data-row="${CID}"] .lastnote .nline`)].map((x) => x.textContent)).toEqual([
+      "10/16（五）11:44 · Kevin enquire@kwcml.com",
+      "10/16（五）11:35 · 第 1 次 · 沒有人接",
+      "10/16（五）11:30 · Kevin 28808224 mr.lau",
+      "名單匯入 no one answer, emailed",
+    ]);
+  });
+
   it("撳「沒有人接」→ 即刻記電話：帶公司、第 1 次、格入面啲字做內容", async () => {
     const { d, posts } = await page();
     await tick();

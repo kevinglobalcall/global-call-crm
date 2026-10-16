@@ -66,6 +66,16 @@ describe("公司清單嘅「最新一條」", () => {
     await addRemark(t.sql, id, "前台話陳生放假");
     expect(await pick()).toMatchObject({ kind: "remark", text: "前台話陳生放假", author: "Kevin" });
 
+    // 「顯示所有備註」：全部都出，新嘅行先；冇內容嘅電話都出（第幾次・結果）；名單匯入最尾、補充跟進排喺結果後面
+    const hist = (await listCompanies(t.sql, { id }, 5, 0)).rows[0]!.history!;
+    expect(hist.map((h) => [h.kind, h.text, h.outcome ?? null, h.attempt_no ?? null])).toEqual([
+      ["remark", "前台話陳生放假", null, null],
+      ["call", "IT 經理陳生", "需要跟進", 2],
+      ["call", null, "沒有人接", 1],
+      ["import", "no one answer, emailed", null, null],
+      ["import", "聯絡人／補充跟進：Mr Wong", null, null],
+    ]);
+
     // id 篩選：淨係出嗰一間
     const other = await makeCompany(t.sql);
     const one = await listCompanies(t.sql, { id: other }, 50, 0);

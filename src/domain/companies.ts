@@ -63,6 +63,8 @@ export interface CompanyListRow {
   website: string | null;
   /** 清單「備註欄」：最新一條（備註或者有內容嘅電話；名單匯入嘅排最後，冇日期） */
   last_note?: LastNote | null;
+  /** 清單「備註欄」顯示晒（Kevin 2026-10-16「顯示所有備註」）：備註＋每次電話，新嘅行先，名單匯入最尾 */
+  history?: LastNote[];
 }
 
 export interface LastNote {
@@ -71,6 +73,7 @@ export interface LastNote {
   at: Date | null;
   author: string | null;
   outcome: string | null;
+  attempt_no?: number | null | undefined;
 }
 
 function where(sql: Sql, f: CompanyFilters) {
@@ -152,6 +155,7 @@ export async function listCompanies(
      order by ${orderBy(sql, f.sort ?? (f.cold ? "never_called" : "recent"))}
      limit ${lim} offset ${off}`;
   await attachLastNotes(sql, rows);
+  await attachAllNotes(sql, rows);
   return { rows, total: summary!.total, totalR: summary!.total_r, totalD: summary!.total_d };
 }
 
@@ -485,5 +489,33 @@ export async function deleteCompany(sql: Sql, id: string, actor = "web"): Promis
                      ${tx.json(toJson({ company: c, phones, emails, contacts, remarks, tasks }))})`;
     return { code: c.code, name: c.name_zh || c.name_en || "" };
   });
+}
+
+/**
+ * 清單每行嘅全部備註（Kevin 2026-10-16「顯示所有備註」）：手寫備註＋每一次電話（冇內容都出「第 N 次 · 結果」），
+ * 有日期嘅新嘅行先；名單匯入嗰啲冇日期，排最尾。一頁幾十間一句 query。
+ */
+async function attachAllNotes(sql: Sql, rows: CompanyListRow[]): Promise<void> {
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.id);
+  const all = await sql<(LastNote & { company_id: string })[]>`
+    select company_id, kind, text, at, author, outcome, attempt_no from (
+      select r.company_id, (case when r.source = 'import' then 'import' else 'remark' end) as kind, r.body as text,
+             case when r.source = 'import' then null else r.created_at end as at,
+             r.author, null::text as outcome, null::int as attempt_no,
+             case when r.source = 'import' then 1 else 2 end as pri, r.created_at as tie
+        from public.company_remarks r where r.company_id = any(${ids}::uuid[])
+      union all
+      select k.company_id, 'call', k.content, k.called_at, null, k.outcome, k.attempt_no, 2, k.called_at
+        from public.calls k where k.company_id = any(${ids}::uuid[])
+    ) u
+    order by company_id, pri desc, at desc nulls last, (text ~ '^[^：]{1,12}：'), tie`;
+  const by = new Map<string, LastNote[]>();
+  for (const n of all) {
+    const list = by.get(n.company_id) ?? [];
+    list.push({ kind: n.kind, text: n.text, at: n.at, author: n.author, outcome: n.outcome, attempt_no: n.attempt_no ?? null });
+    by.set(n.company_id, list);
+  }
+  for (const r of rows) r.history = by.get(r.id) ?? [];
 }
 
