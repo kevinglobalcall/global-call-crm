@@ -224,3 +224,7 @@ th, td:first-child { white-space: nowrap; }
   main { max-width: 1180px; }
   .crow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
 }
+
+/* 記完自動跳去下一間：捲到頂唔好俾黐頂嘅頁頭遮住，閃一閃話你知係呢間 */
+.crow { scroll-margin-top: calc(64px + env(safe-area-inset-top)); transition: background-color .4s; }
+.crow.nextup { background: var(--accent-soft); border-radius: 10px; }

@@ -485,6 +485,32 @@
         if (msg) { var q = $(".qdone", row); q.innerHTML = msg; q.hidden = false; }
       });
     }
+    /**
+     * 記完結果／改完狀態自動跳去下一間（Kevin 2026-10-16「按完狀態後自動跳下一個」）。
+     * 呢間仲喺度（有「撤回」），淨係捲落去；冇下一間而「載多啲」仲有，就先載埋。
+     */
+    function jumpNext(row) {
+      var next = row.nextElementSibling;
+      while (next && !next.hasAttribute("data-row")) next = next.nextElementSibling;
+      var more = $("#more");
+      if (!next && more && !more.hidden) {
+        more.click();
+        var tries = 0;
+        var wait = setInterval(function () {
+          tries++;
+          var n = row.nextElementSibling;
+          if (n || tries > 40) { clearInterval(wait); if (n) go(n); }
+        }, 100);
+        return;
+      }
+      if (next) go(next);
+      function go(el) {
+        if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        el.classList.add("nextup");
+        setTimeout(function () { el.classList.remove("nextup"); }, 1600);
+      }
+    }
+
     function logCall(row, outcome, extra) {
       var id = row.getAttribute("data-row"), c = ROWS[id];
       var note = $('[data-v="note"]', row).value.trim();
@@ -494,8 +520,9 @@
       $$("button", row).forEach(function (b) { b.disabled = true; });
       return api("/calls", body).then(function (res) {
         toast("記低咗：" + nameOf(c) + " 第 " + res.call.attempt_no + " 次 · " + res.call.outcome);
+        // 等嗰行重畫完先跳：佢多咗「記低咗…撤回」會變高，早跳會停喺下一間中間
         return refresh(row, "記低咗：第 " + res.call.attempt_no + " 次 · " + esc(res.call.outcome) +
-          ' <button class="btn sm" data-act="undo" data-call="' + esc(res.call.id) + '">撤回</button>');
+          ' <button class="btn sm" data-act="undo" data-call="' + esc(res.call.id) + '">撤回</button>').then(function () { jumpNext(row); });
       }).catch(function (e) { $$("button", row).forEach(function (b) { b.disabled = false; }); toast(e.message, true); });
     }
     list.addEventListener("click", function (e) {
@@ -559,7 +586,8 @@
         var name = $('[data-v="follower"]', row).value.trim();
         api("/companies/" + id, { status: "其他人跟進", followed_by: name || null }).then(function () {
           toast("改咗做其他人跟進");
-          return refresh(row, "狀態改咗做其他人跟進");
+          // 等嗰行重畫完先跳：佢多咗「記低咗…撤回」會變高，早跳會停喺下一間中間
+          return refresh(row, "狀態改咗做其他人跟進").then(function () { jumpNext(row); });
         }).catch(function (er) { toast(er.message, true); });
       }
     });
@@ -574,7 +602,8 @@
       if (ROWS[id].followed_by) patch.followed_by = null;
       api("/companies/" + id, patch).then(function () {
         toast("狀態：" + before + " → " + sel.value);
-        return refresh(row, "狀態：" + esc(before) + " → " + esc(sel.value));
+        // 等嗰行重畫完先跳：佢多咗「記低咗…撤回」會變高，早跳會停喺下一間中間
+        return refresh(row, "狀態：" + esc(before) + " → " + esc(sel.value)).then(function () { jumpNext(row); });
       }).catch(function (er) { sel.value = before; toast(er.message, true); });
     });
   }

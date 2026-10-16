@@ -404,6 +404,26 @@ describe("公司清單每行：直接打、記結果、改狀態、寫備註（K
     expect(posts().at(-1)).toMatchObject({ body: { outcome: "其他人跟進", otherFollower: "阿明" } });
   });
 
+  it("記完結果自動跳去下一間（Kevin：按完狀態後自動跳下一個）；加備註唔跳", async () => {
+    const CID2 = "cccccccc-0000-0000-0000-000000000002";
+    const two = { total: 2, totalR: 0, totalD: 0, rows: [ROW, { ...ROW, id: CID2, code: "GC-00013", name_zh: "第二間有限公司" }] };
+    const { d } = await boot("#/companies?cold=1", { "/meta": META, "/companies": two, "/calls": CALLED, "/remarks": { ok: true } });
+    await tick();
+    const scrolled: string[] = [];
+    (d.defaultView!.HTMLElement.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.getAttribute("data-row") ?? "");
+    };
+    const first = d.querySelector(`[data-row="${CID}"]`)!;
+    (first.querySelector('[data-v="note"]') as HTMLTextAreaElement).value = "x";
+    click(first.querySelector('[data-act="note"]'));
+    await tick(5);
+    expect(scrolled).toEqual([]);
+    click(d.querySelector(`[data-row="${CID}"] [data-o="不需要"]`));
+    await tick(5);
+    expect(scrolled).toEqual([CID2]);
+    expect(d.querySelector(`[data-row="${CID2}"]`)!.classList.contains("nextup")).toBe(true);
+  });
+
   it("加備註 POST 去嗰間；改狀態下拉即刻存", async () => {
     const { d, posts } = await page();
     await tick();
