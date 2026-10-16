@@ -115,6 +115,14 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
   `parseDbUrl()` 自己拋唔帶網址嘅錯、`tests/lib.test.ts` 驗錯誤訊息冇密碼（破壞測試紅過）。
   **寫任何會碰 secret 嘅錯誤處理，第一個問題係「呢句錯誤訊息印唔印得出 secret」。**
 
+## 備註記錄（Kevin 2026-10-16 掉 MIS Remark Record 截圖：「之後做這種remark」）
+
+- `company_remarks` 表（`src/domain/remarks.ts`）：時間、邊個（Kevin／Claude／名單匯入）、內容；加／刪入 audit。
+- 公司頁「備註記錄」**同電話記錄合埋一條時間線**（Kevin 揀嘅），最新喺頂；新備註格喺頂（跟 MIS）。
+- **名單匯入嘅備註冇真日期**：`created_at` 係匯入嗰刻 —— 網頁排最底、寫「名單匯入（原日期不明）」，
+  MCP `get_company` 都係噉寫。唔准當佢係嗰日講嘅（Kevin：表入面嗰幾行日子「唔準，唔好用」）。
+- MCP `add_remark` ＝ 純文字備註，唔改狀態、唔計通數；打咗電話照用 `log_call`。
+
 ## 外觀（Kevin 2026-10-15「使用官網配色方便手機瀏覽」）
 
 - **配色由官網 globalcall.com.hk 個 theme 抄**（`--wp--preset--color--*`），唔係估：主藍 `#046CB5`（＝logo 個藍）、

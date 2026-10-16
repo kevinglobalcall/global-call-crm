@@ -22,6 +22,7 @@ import {
 } from "../domain/companies.js";
 import { COMPANY_STATUSES, OUTCOMES, RULES } from "../domain/outcomes.js";
 import { listProducts } from "../domain/products.js";
+import { addRemark } from "../domain/remarks.js";
 import { dismissRenewal, renewalsDue } from "../domain/renewals.js";
 import { dailyStats, periodTotals, todayStats } from "../domain/stats.js";
 import { callbacksDue, callbacksUpcoming, cancelTask, completeTask, rescheduleTask } from "../domain/tasks.js";
@@ -174,8 +175,23 @@ export function buildMcpServer(getSql: () => Sql, now: () => Date = () => new Da
         callback: k.callback_at ? fmtHk(k.callback_at) : null,
       })),
       tasks: c.tasks.map((t) => ({ ...t, due: t.due_at ? fmtHk(t.due_at) : null })),
+      // 名單匯入嗰啲冇真日期（created_at 係匯入嗰刻）—— 唔好當佢係嗰日講嘅
+      remarks: c.remarks.slice(0, 20).map((x) => ({
+        when: x.source === "import" ? "名單匯入（原日期不明）" : fmtHk(x.created_at), by: x.author, text: x.body,
+      })),
       nextAttempt: c.company.call_count + 1,
     };
+  })());
+
+  server.registerTool("add_remark", {
+    title: "加備註",
+    description: "喺公司個備註記錄（Remark Record）加一行自由文字，例如「前台話 Leo 放假，下星期再打」。唔改狀態、唔計通數 —— 打咗電話就用 log_call。",
+    inputSchema: { company: z.string().describe("GC-00012、id 或者名"), text: z.string().min(1).max(5000) },
+  }, async (a) => run(async (sql) => {
+    const r = await resolveCompany(sql, a.company);
+    if ("candidates" in r) return { needChoice: true, candidates: r.candidates };
+    const row = await addRemark(sql, r.id, a.text, "mcp");
+    return { saved: true, when: fmtHk(row.created_at), by: row.author, text: row.body };
   })());
 
   server.registerTool("log_call", {

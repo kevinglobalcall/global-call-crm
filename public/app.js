@@ -551,6 +551,31 @@
     });
   }
 
+  /**
+   * 備註記錄（Kevin 2026-10-16 跟公司 MIS 個 Remark Record）：頂一格寫新備註，
+   * 下面備註同電話記錄合埋一條時間線，最新喺頂。
+   * 名單匯入嗰啲冇真日期 —— 排喺最底，寫明「原日期不明」，唔扮有時間。
+   */
+  function timelineCard(d) {
+    var items = d.calls.map(function (k) { return { t: new Date(k.called_at).getTime(), html: callHtml(k) }; })
+      .concat((d.remarks || []).map(function (r) {
+        return { t: r.source === "import" ? -Infinity : new Date(r.created_at).getTime(), html: remarkHtml(r) };
+      }));
+    items.sort(function (a, b) { return b.t - a.t; });
+    return '<div class="card" id="timeline"><h2 style="margin-top:0">備註記錄（' + items.length + "）</h2>" +
+      '<div class="newremark"><textarea id="rmBody" rows="2" placeholder="新備註：例如「前台話 Leo 放假，下星期再打」"></textarea>' +
+      '<button class="btn primary" id="rmSave" disabled>加</button></div>' +
+      (items.length ? items.map(function (x) { return x.html; }).join("") : '<p class="muted">未打過、未有備註</p>') + "</div>";
+  }
+
+  function remarkHtml(r) {
+    var when = r.source === "import" ? "名單匯入（原日期不明）" : fmt(r.created_at);
+    return '<div class="remark" data-remark="' + esc(r.id) + '"><div class="spread"><span><b>' + esc(when) + "</b> " +
+      (r.source === "import" ? "" : '<span class="muted small">' + esc(r.author) + "</span>") + "</span>" +
+      '<button class="btn sm danger" data-act="del-remark">刪</button></div>' +
+      '<div class="pre">' + esc(r.body) + "</div></div>";
+  }
+
   function callHtml(k) {
     var dBits = [k.d_provider, k.d_contract_end ? "約滿 " + k.d_contract_end : "", k.d_price, k.d_plan].filter(Boolean);
     return '<div class="call" data-call="' + esc(k.id) + '"><div class="spread"><span><b>' + esc(fmt(k.called_at)) + "</b> 第 " + k.attempt_no + " 次 " +
@@ -594,6 +619,7 @@
         '<div class="row" style="margin-top:8px"><label class="check"><input type="checkbox" id="mis"' + (c.mis_checked ? " checked" : "") + "> MIS 查過（唔係現有客）</label></div></div>";
 
       html += callForm(d);
+      html += timelineCard(d);
       html += bookingCard(d);
 
       html += '<div class="card"><h2 style="margin-top:0">有興趣嘅產品</h2><div class="chips" id="prods">' +
@@ -608,9 +634,6 @@
             overdue: !!t.due_at && new Date(t.due_at).getTime() < nowMs }, true);
         }).join("") + "</div>";
       }
-
-      html += '<div class="card"><h2 style="margin-top:0">電話記錄（' + d.calls.length + "）</h2>" +
-        (d.calls.length ? d.calls.map(callHtml).join("") : '<p class="muted">未打過</p>') + "</div>";
 
       html += '<div class="card"><h2 style="margin-top:0">聯絡人</h2><div id="contacts">' +
         (d.contacts.length ? d.contacts.map(function (p) {
@@ -675,6 +698,21 @@
               dPrice: v("dPrice").value.trim() || null, dPlan: v("dPlan").value.trim() || null,
             }).then(function () { toast("改咗"); render(); }).catch(function (er) { toast(er.message, true); });
           }
+        });
+      });
+      var rmBody = $("#rmBody"), rmSave = $("#rmSave");
+      rmBody.addEventListener("input", function () { rmSave.disabled = !rmBody.value.trim(); });
+      rmSave.addEventListener("click", function () {
+        rmSave.disabled = true;
+        api("/companies/" + c.id + "/remarks", { body: rmBody.value })
+          .then(function () { toast("加咗備註"); render(); })
+          .catch(function (er) { rmSave.disabled = false; toast(er.message, true); });
+      });
+      $$("[data-remark]").forEach(function (row) {
+        $('[data-act="del-remark"]', row).addEventListener("click", function () {
+          if (!confirm("刪咗呢條備註？")) return;
+          api("/remarks/" + row.getAttribute("data-remark") + "/delete", {}).then(function () { toast("刪咗"); render(); })
+            .catch(function (er) { toast(er.message, true); });
         });
       });
       $$("[data-contact]").forEach(function (row) {

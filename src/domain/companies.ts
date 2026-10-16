@@ -5,6 +5,7 @@
  * 篩選結果頂會出「共 N 間 · 當中 R x 間 · D y 間」—— Kevin 要嘅「有幾多個 R 幾多個 D」。
  */
 
+import { listRemarks } from "./remarks.js";
 import { toJson, type Sql } from "../db/client.js";
 import { COMPANY_STATUSES, type CompanyStatus } from "./outcomes.js";
 import { blankToNull, escapeLike, nameKey, nospace } from "../lib/text.js";
@@ -156,7 +157,7 @@ export async function getCompany(sql: Sql, idOrCode: string) {
     : await sql<CompanyListRow[]>`select * from public.company_overview where upper(code) = ${idOrCode.trim().toUpperCase()}`;
   if (!company) return null;
   const id = company.id;
-  const [phones, emails, contacts, products, calls, tasks] = await Promise.all([
+  const [phones, emails, contacts, products, calls, tasks, remarks] = await Promise.all([
     sql<{ id: string; phone: string; label: PhoneLabel; raw: string | null; sort: number }[]>`
       select id, phone, label, raw, sort from public.company_phones where company_id = ${id} order by sort, created_at`,
     sql<{ id: string; email: string; sort: number }[]>`
@@ -174,8 +175,9 @@ export async function getCompany(sql: Sql, idOrCode: string) {
           source_call_id: string | null; created_at: Date }[]>`
       select id, kind, due_at, status, note, source_call_id, created_at from public.tasks
        where company_id = ${id} and status = '待辦' order by (due_at is null), due_at`,
+    listRemarks(sql, id),
   ]);
-  return { company, phones, emails, contacts, products, calls, tasks };
+  return { company, phones, emails, contacts, products, calls, tasks, remarks };
 }
 
 // ── 開新／改 ──────────────────────────────────────────────────────────────

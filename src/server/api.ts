@@ -23,6 +23,7 @@ import { companiesXlsx } from "../domain/export.js";
 import { commitImport, loadExisting, planImport, readTable, type ImportPlan } from "../domain/importer.js";
 import { COMPANY_STATUSES, OUTCOMES, RULES } from "../domain/outcomes.js";
 import { createProduct, listProducts, updateProduct } from "../domain/products.js";
+import { addRemark, deleteRemark } from "../domain/remarks.js";
 import { dismissRenewal, renewalsDue } from "../domain/renewals.js";
 import { dailyStats, periodTotals, todayStats } from "../domain/stats.js";
 import { callbacksDue, callbacksUpcoming, cancelTask, completeTask, rescheduleTask } from "../domain/tasks.js";
@@ -321,6 +322,18 @@ export function createApi(deps: { sql: () => Sql; now?: () => Date }) {
         ok({ ok: true });
         return true;
       }
+    }
+
+    if (m === "POST" && seg[0] === "companies" && seg[2] === "remarks" && seg.length === 3) {
+      const b = parse(z.object({ body: z.string().max(5000) }), await readJson(req));
+      ok({ remark: await addRemark(sql, parse(uuid, seg[1]), b.body) });
+      return true;
+    }
+
+    if (m === "POST" && seg[0] === "remarks" && seg[1] && seg[2] === "delete") {
+      await deleteRemark(sql, parse(uuid, seg[1]));
+      ok({ ok: true });
+      return true;
     }
 
     if (m === "POST" && seg[0] === "companies" && seg[2] === "contacts" && seg.length === 3) {

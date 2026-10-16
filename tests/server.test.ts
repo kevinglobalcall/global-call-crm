@@ -486,6 +486,21 @@ describe("claude.ai connector：預約", () => {
     expect((await t.sql`select count(*)::int as n from public.appointments`)[0]!.n).toBe(before);
   });
 
+  it("add_remark 寫得入、網頁 API 讀得返；get_company 帶埋備註", async () => {
+    const token = await oauthToken();
+    const c = await tool(token, "create_company", { name_zh: "備註測試公司", phones: "3999 8888" });
+    const code = c.body.company.code as string;
+    const r = await tool(token, "add_remark", { company: code, text: "Left phone number to reception" });
+    expect(r.body).toMatchObject({ saved: true, by: "Claude", text: "Left phone number to reception" });
+    const g = await tool(token, "get_company", { company: code });
+    expect(g.body.remarks).toEqual([expect.objectContaining({ by: "Claude", text: "Left phone number to reception" })]);
+    const cookie = await login();
+    const page = await api(cookie, `/companies/${code}`);
+    expect(page.status).toBe(200);
+    expect((page.j.remarks as { body: string; source: string }[]).map((x) => [x.body, x.source]))
+      .toEqual([["Left phone number to reception", "mcp"]]);
+  });
+
   it("today_stats 有今日約；renewals_due 列得出", async () => {
     const token = await oauthToken();
     const r = await tool(token, "today_stats", {});

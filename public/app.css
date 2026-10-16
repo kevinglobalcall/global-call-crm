@@ -187,3 +187,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, .btn:focus-vi
 /* 表頭／日子唔准一個字一行（「通／數」）—— 窄就喺 .scroll 入面打橫捲 */
 th, td:first-child { white-space: nowrap; }
 @media (max-width: 720px) { th, td { padding: 6px 5px; } }
+
+/* 備註記錄（Remark Record）：頂一格寫新備註，下面備註＋電話一條時間線 */
+.newremark { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 6px; }
+.newremark textarea { min-height: 44px; }
+.newremark .btn { flex: none; }
+.remark { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.remark:last-child { border-bottom: 0; }
+.remark .pre { margin-top: 2px; }
+#timeline .call, #timeline .remark { border-left: 3px solid transparent; padding-left: 10px; margin-left: -2px; }
+#timeline .call { border-left-color: var(--accent); }
+#timeline .remark { border-left-color: var(--line); }

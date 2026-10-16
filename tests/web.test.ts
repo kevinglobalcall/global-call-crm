@@ -125,6 +125,10 @@ function companyFixture(over: Record<string, unknown> = {}) {
       reached_r: false, got_d: false, content: "冇人聽", callback_at: null, d_contract_end: null, d_provider: null, d_price: null, d_plan: null,
     }],
     tasks: [], nextAttempt: 3,
+    remarks: [
+      { id: "rrrrrrrr-0000-0000-0000-000000000001", body: "前台話 Leo 放假", author: "Kevin", source: "web", created_at: "2026-10-14T03:00:00.000Z" },
+      { id: "rrrrrrrr-0000-0000-0000-000000000002", body: "no need, emailed", author: "名單匯入", source: "import", created_at: "2026-10-16T09:00:00.000Z" },
+    ],
   };
 }
 
@@ -134,6 +138,32 @@ async function companyPage(over: Record<string, unknown> = {}) {
     "/calls": { call: { attempt_no: 3, outcome: "x" }, statusBefore: "跟進中", statusAfter: "跟進中", closedTasks: 1, task: null },
   });
 }
+
+describe("公司頁：備註記錄（Remark Record）", () => {
+  it("備註同電話合埋一條時間線，最新喺頂；名單匯入嗰條排最底、寫明原日期不明", async () => {
+    const { d } = await companyPage();
+    const rows = [...d.querySelectorAll("#timeline .remark, #timeline .call")];
+    expect(rows.map((r) => r.getAttribute("data-remark") ?? r.getAttribute("data-call"))).toEqual([
+      "rrrrrrrr-0000-0000-0000-000000000001", // 10/14 備註
+      "kkkkkkkk-0000-0000-0000-000000000001", // 10/13 電話
+      "rrrrrrrr-0000-0000-0000-000000000002", // 匯入：created_at 雖然最新，但冇真日期 → 最底
+    ]);
+    expect(rows[0]!.textContent).toContain("10/14（三）11:00");
+    expect(rows[2]!.textContent).toContain("名單匯入（原日期不明）");
+    expect(rows[2]!.textContent).not.toMatch(/10\/16/);
+  });
+
+  it("冇字唔撳得；寫咗就 POST 去嗰間公司", async () => {
+    const { d, posts } = await companyPage();
+    const box = d.querySelector("#rmBody") as HTMLTextAreaElement, btn = d.querySelector("#rmSave") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    box.value = "a women pick up, dunno leo";
+    box.dispatchEvent(new d.defaultView!.Event("input"));
+    expect(btn.disabled).toBe(false);
+    click(btn);
+    expect(posts().at(-1)).toMatchObject({ url: `/app/api/companies/${CID}/remarks`, body: { body: "a women pick up, dunno leo" } });
+  });
+});
 
 describe("公司頁：記電話", () => {
   it("資料由 server 嚟；傳真唔做撥號連結；第幾次預填 ＝ 打過幾次 +1", async () => {
