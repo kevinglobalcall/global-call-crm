@@ -433,6 +433,18 @@
     return '<b class="small">' + esc(head) + "</b> " + esc(n.text);
   }
 
+  /**
+   * 網址（Kevin 2026-10-16「加顯示網址」）：一格可以有幾個（名單用「 | 」或者空格分）；冇 http 就補 https://。
+   * ❗淨係 http／https 先做連結 —— 匯入嘅字唔可以變 javascript: 連結。開新分頁，唔好踢走 CRM。
+   */
+  function siteLinks(v) {
+    return String(v || "").split(/\s*\|\s*|\s+/).filter(Boolean).map(function (u) {
+      var href = /^https?:\/\//i.test(u) ? u : /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(u) ? "https://" + u : null;
+      var label = u.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, "");
+      return href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(label) + "</a>" : '<span class="muted">' + esc(u) + "</span>";
+    }).join(" · ");
+  }
+
   /** 全部備註（新嘅行先）；未有就講未有 */
   function notesHtml(c) {
     var list = c.history || (c.last_note ? [c.last_note] : []);
@@ -453,6 +465,7 @@
       '<button type="button" class="btn sm danger" data-act="del-co">刪除</button></span></div>' +
       '<div class="dials">' + rowPhones(c) + "</div>" +
       (emails.length ? '<div class="small">' + emails.map(function (e) { return '<a href="mailto:' + esc(e) + '">' + esc(e) + "</a>"; }).join(" · ") + "</div>" : "") +
+      (c.website ? '<div class="small site">🌐 ' + siteLinks(c.website) + "</div>" : "") +
       '<div class="row small"><select class="stsel" data-act="status" aria-label="狀態">' +
       m.statuses.map(function (st) { return opt(st, st, c.status); }).join("") + "</select> " + rd(c.ever_r, c.ever_d) +
       (c.industry ? ' <span class="muted">' + esc(c.industry) + "</span>" : "") +
@@ -812,7 +825,8 @@
         (d.phones.length ? "" : '<span class="muted">冇電話</span>') + "</div>" +
         (d.emails.length ? '<div class="small">' + d.emails.map(function (e) { return '<a href="mailto:' + esc(e.email) + '">' + esc(e.email) + "</a>"; }).join(" · ") + "</div>" : "") +
         (c.address_zh || c.address_en ? '<div class="small muted">' + esc([c.address_zh, c.address_en].filter(Boolean).join(" / ")) + "</div>" : "") +
-        '<div class="small muted">' + esc([c.industry, c.customer_type === "個人" ? "個人客" : "", c.br_no ? "BR " + c.br_no : "", c.website].filter(Boolean).join(" · ")) + "</div>" +
+        '<div class="small muted">' + esc([c.industry, c.customer_type === "個人" ? "個人客" : "", c.br_no ? "BR " + c.br_no : ""].filter(Boolean).join(" · ")) + "</div>" +
+        (c.website ? '<div class="small site">🌐 ' + siteLinks(c.website) + "</div>" : "") +
         (c.followed_by ? '<div class="note">' + esc(c.followed_by) + " 跟緊 —— 唔好撞單</div>" : "") +
         '<div class="row" style="margin-top:8px"><label class="check"><input type="checkbox" id="mis"' + (c.mis_checked ? " checked" : "") + "> MIS 查過（唔係現有客）</label></div></div>";
 
@@ -1335,6 +1349,18 @@
   }
 
   window.addEventListener("hashchange", function () { closeSearch(); render(); window.scrollTo(0, 0); });
+
+  // 加咗落主畫面（PWA）嗰陣，iPhone 唔理 target=_blank，撳外部網址會成個 app 走咗去個網度、冇得返轉頭
+  // （Equal CRM 中過）。試 window.open 開喺上面；開唔到先照預設行為。
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest('a[target="_blank"]');
+    if (!a) return;
+    var standalone = window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+    if (!standalone) return;
+    var w = window.open(a.href, "_blank", "noopener");
+    if (w) e.preventDefault();
+  });
 
   // ── 全站搜尋（Kevin 2026-10-16「全部頁面都要加全站search」）──────────────────
   // 頁頭一格：打字 → 下拉出頭 8 間（名／電話／電郵／編號／聯絡人，空格唔理）；撳一間入公司頁；

@@ -464,6 +464,19 @@ describe("公司清單每行：直接打、記結果、改狀態、寫備註（K
     ]);
   });
 
+  it("顯示網址（Kevin：加顯示網址）：幾個網址拆開、開新分頁；javascript: 唔做連結", async () => {
+    const withSite = { ...LIST2, rows: [{ ...ROW, website: "https://www.towngas.com | towngassmartenergy.com javascript:alert(1)" }] };
+    const { d } = await boot("#/companies?cold=1", { "/meta": META, "/companies": withSite });
+    await tick();
+    const links = [...d.querySelectorAll(`[data-row="${CID}"] .site a`)];
+    expect(links.map((a) => [a.getAttribute("href"), a.textContent, a.getAttribute("target")])).toEqual([
+      ["https://www.towngas.com", "towngas.com", "_blank"],
+      ["https://towngassmartenergy.com", "towngassmartenergy.com", "_blank"],
+    ]);
+    expect(d.querySelector(`[data-row="${CID}"] .site`)!.textContent).toContain("javascript:alert(1)");
+    expect(d.querySelector('a[href^="javascript"]')).toBeNull();
+  });
+
   it("撳「沒有人接」→ 即刻記電話：帶公司、第 1 次、格入面啲字做內容", async () => {
     const { d, posts } = await page();
     await tick();

@@ -272,3 +272,5 @@ td.num a { font-weight: 600; }
   .themebtn span { display: none; }
   .themebtn { margin-left: 0; }
 }
+
+.site { word-break: break-all; margin-top: 2px; }

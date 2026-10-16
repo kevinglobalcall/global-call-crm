@@ -155,6 +155,8 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
   新嘅行先，名單匯入最尾；格太長就喺格入面捲）＋「加備註」。❗唔好叫 `notes`，撞 companies.notes 欄。
 - **記完結果／改完狀態自動跳去下一間**（Kevin「按完狀態後自動跳下一個」）；加備註、撤回唔跳。
   ❗要等嗰行重畫完先跳 —— 佢多咗「記低咗…撤回」會高 65px，早跳會停喺下一間中間（真瀏覽器量到先捉到，jsdom 測唔到）。
+- **網址**（Kevin「加顯示網址」）：清單同公司頁都出，`siteLinks()` 拆「 | 」／空格、冇 http 補 https、開新分頁；
+  淨係 http／https 先做連結（匯入嘅字唔准變 `javascript:`）。加咗落主畫面（PWA）用 window.open，唔係 iPhone 會成個 app 走咗去。
 - 記完淨係重畫嗰一行（`/companies?id=`），唔重載成版；仲喺唔喺呢個清單用同一組篩選＋id 問一次，唔喺就灰咗唔即刻消失。
 - `last_note` 唔加落 view：本機 11,803 間實測冷電 count 0.24 秒，view 再加 lateral 只會更慢；一頁 50 間另外一句 query。
 - ❗**auto 模式下改 CRM 資料（MCP 寫入）仍然會問 Kevin 批准**，而我唔准自己改權限設定（self-modification 被擋）。
