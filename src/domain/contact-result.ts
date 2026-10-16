@@ -12,13 +12,17 @@
  *   打過未有結論：no one answer／one ring／vm、left contact／call tmr／in meeting、
  *   wts、email only／ask to email、淨係 emailed           → 跟進中
  *   日子分隔行（14/10…）「唔準，唔好用」—— 冇公司名，匯入本身就跳過。
+ *   ex／billing（「ex , billing當係現時客戶」）              → 其他人跟進，followed_by「現時客戶」
+ *     （佢揀「其他人跟進」唔揀「已成交」—— 已成交留畀佢自己傾落嘅單，第四期計 GP 唔會撈埋）
  */
 import type { CompanyStatus } from "./outcomes.js";
 
-export interface ResultRule { status: CompanyStatus; rule: string }
+export interface ResultRule { status: CompanyStatus; rule: string; followedBy?: string }
 
 /** 次序有意思：結業、電話死行先（「close, emailed」唔好俾 emailed 嗰條食咗）。 */
-const RULES: { rule: string; status: CompanyStatus; re: RegExp }[] = [
+const RULES: { rule: string; status: CompanyStatus; re: RegExp; followedBy?: string }[] = [
+  // 行最先：「ex, emailed」唔好俾下面「淨係 emailed」嗰類食咗
+  { rule: "現時客戶", status: "其他人跟進", re: /^ex\b|^billing\b/, followedBy: "現時客戶" },
   { rule: "結業", status: "已結業", re: /^close\b|永久停業/ },
   { rule: "電話打唔通", status: "不需要", re: /\bdead\b|cut line/ },
   { rule: "唔需要", status: "不需要", re: /\bno need\b|not interest|\bon need\b/ },
@@ -45,5 +49,5 @@ export function classifyResult(text: string | null | undefined): ResultRule | nu
   const exact = EXACT[t];
   if (exact) return { status: exact, rule: "Kevin 逐行答" };
   const hit = RULES.find((r) => r.re.test(t));
-  return hit ? { status: hit.status, rule: hit.rule } : null;
+  return hit ? { status: hit.status, rule: hit.rule, ...(hit.followedBy ? { followedBy: hit.followedBy } : {}) } : null;
 }

@@ -135,7 +135,7 @@ export interface PlannedRow {
   /** 「聯絡結果」等欄嘅原文 —— 開公司嗰陣寫做備註記錄（source=import，原日期不明） */
   remarks: string[];
   /** 聯絡結果原文同認到嘅規則（null ＝ 認唔到，狀態唔郁） */
-  result?: { text: string; status: CompanyStatus | null; rule: string | null };
+  result?: { text: string; status: CompanyStatus | null; rule: string | null; followedBy?: string };
 }
 
 export interface UnknownResult { line: number; name: string; text: string }
@@ -293,7 +293,7 @@ export function planImport(
           break;
         case "result": {
           const hit = classifyResult(v);
-          result = { text: v, status: hit?.status ?? null, rule: hit?.rule ?? null };
+          result = { text: v, status: hit?.status ?? null, rule: hit?.rule ?? null, ...(hit?.followedBy ? { followedBy: hit.followedBy } : {}) };
           remarks.unshift(v);
           break;
         }
@@ -320,6 +320,7 @@ export function planImport(
     if (notes.length) c.notes = notes.join("\n");
 
     if (result?.status) c.status = result.status;
+    if (result?.followedBy) c.followed_by = result.followedBy;
     const row: PlannedRow = { line, action: "new", company: c, phones, emails, warnings, remarks, ...(result ? { result } : {}) };
     rows.push(row);
 
@@ -345,12 +346,14 @@ export function planImport(
           // 第一行未打過、呢行先有結果 → 用呢行嘅（唔係就靜靜雞變返「未打」）
           first.result = result;
           if (result.status) first.company.status = result.status;
+          if (result.followedBy) first.company.followed_by = result.followedBy;
         } else if (first.result.status !== result.status) {
           // 兩行都打過、結果唔同 —— 唔揀，狀態留未打，問返 Kevin
           conflicts.push({ line: first.line, name: first.company.name_zh || first.company.name_en || "",
             text: `「${first.result.text}」（第 ${first.line} 行）vs「${result.text}」（第 ${line} 行）` });
           first.result = { text: `${first.result.text} ／ ${result.text}`, status: null, rule: null };
           delete first.company.status;
+          delete first.company.followed_by;
         }
       }
       row.action = "skip"; row.reason = `檔案入面重複，併入第 ${first.line} 行`; return;
@@ -437,7 +440,7 @@ export async function commitImport(
           id, name_zh: blankToNull(c.name_zh), name_en: blankToNull(c.name_en), customer_type: c.customer_type ?? "公司",
           industry: blankToNull(c.industry), address_zh: blankToNull(c.address_zh), address_en: blankToNull(c.address_en),
           br_no: blankToNull(c.br_no), website: blankToNull(c.website), notes: blankToNull(c.notes), source,
-          status: c.status ?? "未打",
+          status: c.status ?? "未打", followed_by: blankToNull(c.followed_by),
         };
       });
       // 逐行 insert 一樣會用 sequence 出 code，次序跟 values 次序 —— 同逐行入一樣

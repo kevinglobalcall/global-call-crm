@@ -118,11 +118,12 @@ describe("Kevin 個整合名單（2026-10-15 版）—— 欄名同真檔一樣"
     const plan = planImport(table, { byName: new Map(), byPhone: new Map() });
     const [a, b, c, d, e, marker] = plan.rows;
     expect([a!.company.status, b!.company.status, c!.company.status, d!.company.status, e!.company.status])
-      .toEqual(["不需要", "已結業", "跟進中", undefined, undefined]);
+      .toEqual(["不需要", "已結業", "跟進中", "其他人跟進", undefined]);
+    expect(d!.company.followed_by).toBe("現時客戶"); // billing ＝ 現時客戶
     expect(c!.remarks).toEqual(["no one answer, emailed", "聯絡人／補充跟進：Mr Wong(IT)"]);
     expect(d!.remarks).toEqual(["billing"]);
-    expect(plan.unknownResults).toEqual([{ line: 5, name: "VETRACKR LIMITED", text: "billing" }]);
-    expect(plan.byStatus).toEqual({ 不需要: 1, 已結業: 1, 跟進中: 1, 未打: 2 });
+    expect(plan.unknownResults).toEqual([]);
+    expect(plan.byStatus).toEqual({ 不需要: 1, 已結業: 1, 跟進中: 1, 其他人跟進: 1, 未打: 1 });
     // 「未核實」唔係認唔到嘅號碼，係冇號碼：唔出警告、唔落備註
     expect(e!.phones).toEqual([]);
     expect(e!.warnings.join()).not.toMatch(/未核實/);
@@ -172,17 +173,21 @@ describe("Kevin 個整合名單（2026-10-15 版）—— 欄名同真檔一樣"
   it("寫入：狀態落公司、原文落備註記錄（source=import、名單匯入）", async () => {
     const table = await readTable(csv(H +
       "匯入甲工程有限公司,,2999 0001,\"dead, emailed\",Mr Chan,,,,,,A\n" +
-      "匯入乙工程有限公司,,2999 0002,,,,,,,,A\n"), "x.csv");
+      "匯入乙工程有限公司,,2999 0002,,,,,,,,A\n" +
+      "匯入丙工程有限公司,,2999 0003,ex alvin,,,,,,,A\n"), "x.csv");
     const plan = planImport(table, await loadExisting(t.sql));
     await commitImport(t.sql, plan, "list.xlsx", "test", "2026-10-16");
-    const rows = await t.sql<{ name_zh: string; status: string; remarks: { body: string; source: string; author: string }[] | null }[]>`
-      select c.name_zh, c.status,
+    const rows = await t.sql<{ name_zh: string; status: string; followed_by: string | null; remarks: { body: string; source: string; author: string }[] | null }[]>`
+      select c.name_zh, c.status, c.followed_by,
              (select json_agg(json_build_object('body', r.body, 'source', r.source, 'author', r.author) order by r.body)
                 from public.company_remarks r where r.company_id = c.id) as remarks
         from public.companies c where c.name_zh like '匯入%' order by c.name_zh`;
     expect(rows).toEqual([
-      { name_zh: "匯入乙工程有限公司", status: "未打", remarks: null },
-      { name_zh: "匯入甲工程有限公司", status: "不需要", remarks: [
+      { name_zh: "匯入丙工程有限公司", status: "其他人跟進", followed_by: "現時客戶", remarks: [
+        { body: "ex alvin", source: "import", author: "名單匯入" },
+      ] },
+      { name_zh: "匯入乙工程有限公司", status: "未打", followed_by: null, remarks: null },
+      { name_zh: "匯入甲工程有限公司", status: "不需要", followed_by: null, remarks: [
         { body: "dead, emailed", source: "import", author: "名單匯入" },
         { body: "聯絡人／補充跟進：Mr Chan", source: "import", author: "名單匯入" },
       ] },

@@ -31,8 +31,18 @@ describe("聯絡結果 → 狀態（淨係 Kevin 拍板咗嘅）", () => {
     }
   });
 
+  it("ex／billing ＝ 現時客戶 → 其他人跟進（Kevin：「ex , billing當係現時客戶」）", () => {
+    for (const t of ["ex (Joshua Kwan)", "ex alvin", "ex, emailed", "ex , emailed", "billing"]) {
+      expect([t, classifyResult(t)]).toEqual([t, { status: "其他人跟進", rule: "現時客戶", followedBy: "現時客戶" }]);
+    }
+    // 唔可以食咗開頭係 ex／e 嘅其他字
+    expect(classifyResult("excel list")).toBeNull();
+    expect(st("emailed")).toBe("跟進中");
+    expect(st("email only, emailed")).toBe("跟進中");
+  });
+
   it("❗認唔到就回 null（唔估）—— 呢啲係 Kevin 要逐個答嘅", () => {
-    for (const t of ["billing", "fax, emailed", "ex alvin", "amy wong", "JU", "ow msg, emailed", "97713311, emailed",
+    for (const t of ["fax, emailed", "amy wong", "JU", "ow msg, emailed", "97713311, emailed",
       "2 weeks hoilday, emailed", "interest esg, emailed", "客戶自己sim , emailed", "next week", "2026-10-30", "14/10", "", "  "]) {
       expect([t, classifyResult(t)]).toEqual([t, null]);
     }
