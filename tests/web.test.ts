@@ -337,6 +337,31 @@ describe("公司清單", () => {
   });
 });
 
+describe("深淺色（Kevin 2026-10-16「web也要dark mode」）", () => {
+  it("預設深色（一開頁未行 app.js 已經套用）；撳掣：深 → 淺 → 跟系統 → 深，記低喺呢部機", async () => {
+    const { d, w } = await boot("#/", { "/meta": META, "/today": TODAY, "/tasks": { ok: true } });
+    const html = d.documentElement;
+    expect(html.getAttribute("data-theme")).toBe("dark");
+    const btn = d.querySelector("#themeBtn") as HTMLButtonElement;
+    expect(btn.textContent).toBe("深色");
+    click(btn);
+    expect([html.getAttribute("data-theme"), w.localStorage.getItem("gc-theme"), btn.textContent]).toEqual(["light", "light", "淺色"]);
+    click(btn);
+    // 跟系統 ＝ 唔寫 data-theme，由 CSS prefers-color-scheme 話事
+    expect([html.hasAttribute("data-theme"), w.localStorage.getItem("gc-theme"), btn.textContent]).toEqual([false, "auto", "跟系統"]);
+    click(btn);
+    expect(html.getAttribute("data-theme")).toBe("dark");
+  });
+
+  it("❗CSS 真係有 [data-theme=dark] 嗰套色（唔係淨係跟系統）—— 唔係粒掣撳咗都冇用", () => {
+    const css = readFileSync(join(PUB, "app.css"), "utf8");
+    const block = /:root\[data-theme="dark"\]\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(block).toMatch(/--bg:\s*#0a1428/);
+    expect(block).toMatch(/--card:/);
+    expect(block).toMatch(/color-scheme:\s*dark/);
+  });
+});
+
 describe("撳個數睇係邊幾間（Kevin：要能夠點開顯示什麼公司）", () => {
   it("今日六格都係連結，帶 kind 同今日日子", async () => {
     const { d } = await boot("#/", { "/meta": META, "/today": TODAY, "/tasks": { ok: true } });

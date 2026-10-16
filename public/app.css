@@ -234,3 +234,11 @@ a.stat { display: block; text-decoration: none; color: inherit; }
 a.stat:hover { border-color: var(--accent); }
 a.stat:active { background: var(--accent-soft); }
 td.num a { font-weight: 600; }
+
+/* 深淺色掣（頁頭右邊；手機個頁頭淨係得 logo 同佢） */
+.themebtn { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 6px 10px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,.25); background: transparent; color: var(--brand-ink); cursor: pointer;
+            font-size: .8rem; white-space: nowrap; }
+.themebtn svg { width: 16px; height: 16px; }
+.themebtn:hover { background: rgba(255,255,255,.1); }
+@media (max-width: 720px) { .themebtn { margin-left: auto; } }

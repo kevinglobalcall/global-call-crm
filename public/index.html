@@ -16,6 +16,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/app/app.css">
+<script>
+  // 深淺色：一開頁就套用（唔好閃一下白先轉深）。預設深色（Kevin 2026-10-16「web也要dark mode」）；
+  // 「跟系統」＝ 唔寫 data-theme，由 CSS 個 prefers-color-scheme 話事。讀唔到 localStorage 照用深色。
+  (function () {
+    var t = "dark";
+    try { t = localStorage.getItem("gc-theme") || "dark"; } catch (e) {}
+    if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
 </head>
 <body>
 <header class="top">
@@ -27,6 +36,7 @@
     <a href="#/stats" data-tab="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>數</a>
     <a href="#/more" data-tab="more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>更多</a>
   </nav>
+  <button type="button" class="themebtn" id="themeBtn" aria-label="深淺色"></button>
 </header>
 <main id="view" aria-live="polite"><p class="muted pad">載入緊…</p></main>
 <div id="toast" class="toast" role="status" hidden></div>

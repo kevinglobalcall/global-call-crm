@@ -171,6 +171,9 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
 - **logo／app icon 由官網 `logo-1200x628-4.png` 裁出嚟**（官網自己個 icon 得 80px，放大會矇）。
   `public/` 有 logo／favicon／apple-touch-icon／icon-192／icon-512 ＋ `manifest.webmanifest`，iPhone「加到主畫面」似個 app。
   `tests/server.test.ts` 會逐個 icon 讀 PNG 闊高對返 manifest 講嘅 sizes。
+- **深淺色**（Kevin 2026-10-16「web也要dark mode」）：**預設深色**，頁頭粒掣轉 深 → 淺 → 跟系統，記喺 localStorage
+  `gc-theme`（每部機自己記）。`index.html` 個 inline script 一開頁就套用，唔會閃白；讀唔到 localStorage 照用深色。
+  「跟系統」＝ 唔寫 `data-theme`，由 CSS prefers-color-scheme 話事。
 - 手機：公司頁電話係大粒「一撳就打」掣（`.dial`）；「記低」掣黐住底；輸入格 16px（細過 iPhone 會自己 zoom）。
 - **改外觀要真係睇過**：`scripts/dev-seed.ts` 入示範資料（淨係肯行本機 DB），Chromium 390px 截晒五個 tab ＋ 公司頁 ＋ 登入頁，
   淺色深色各一，`scrollWidth` 要等於 390（冇打橫捲）。今次就係咁捉到登入框爆出右邊、表頭一個字一行。
