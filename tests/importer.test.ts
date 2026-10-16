@@ -187,7 +187,7 @@ describe("Kevin 個整合名單（2026-10-15 版）—— 欄名同真檔一樣"
         { body: "ex alvin", source: "import", author: "名單匯入" },
       ] },
       { name_zh: "匯入乙工程有限公司", status: "未打", followed_by: null, remarks: null },
-      { name_zh: "匯入甲工程有限公司", status: "不需要", followed_by: null, remarks: [
+      { name_zh: "匯入甲工程有限公司", status: "唔通", followed_by: null, remarks: [ // dead → 唔通（Kevin 2026-10-16）
         { body: "dead, emailed", source: "import", author: "名單匯入" },
         { body: "聯絡人／補充跟進：Mr Chan", source: "import", author: "名單匯入" },
       ] },

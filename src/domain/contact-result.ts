@@ -7,7 +7,8 @@
  *
  * 佢拍板嘅（2026-10-16，對住 2026-10-15 版整合公司名單）：
  *   no need／not interest（連 on need、emaied 呢類錯字）→ 不需要
- *   dead／phone dead／cut line                         → 不需要（「唔再出冷電名單」）
+ *   dead／phone dead                                   → 唔通（2026-10-16 加咗「唔通」狀態之後佢改：「dead 唔通」）
+ *   cut line                                           → 不需要（佢：「cut line 不需要」）
  *   close／永久停業                                     → 已結業
  *   打過未有結論：no one answer／one ring／vm、left contact／call tmr／in meeting、
  *   wts、email only／ask to email、淨係 emailed           → 跟進中
@@ -24,7 +25,8 @@ const RULES: { rule: string; status: CompanyStatus; re: RegExp; followedBy?: str
   // 行最先：「ex, emailed」唔好俾下面「淨係 emailed」嗰類食咗
   { rule: "現時客戶", status: "其他人跟進", re: /^ex\b|^billing\b/, followedBy: "現時客戶" },
   { rule: "結業", status: "已結業", re: /^close\b|永久停業/ },
-  { rule: "電話打唔通", status: "不需要", re: /\bdead\b|cut line/ },
+  { rule: "電話打唔通", status: "唔通", re: /\bdead\b/ },
+  { rule: "cut line", status: "不需要", re: /cut line/ },
   { rule: "唔需要", status: "不需要", re: /\bno need\b|not interest|\bon need\b/ },
   { rule: "冇人接", status: "跟進中", re: /no one answer|no answer|one ring|^vm\b|left vm/ },
   { rule: "約回撥／留咗聯絡", status: "跟進中", re: /call bk|call tmr|call later|will call|in meeting|not in office|left (num|contact|conact)/ },

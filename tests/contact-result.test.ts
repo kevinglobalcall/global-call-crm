@@ -14,8 +14,9 @@ describe("聯絡結果 → 狀態（淨係 Kevin 拍板咗嘅）", () => {
     }
   });
 
-  it("dead／phone dead／cut line → 不需要（Kevin：唔再出冷電名單）", () => {
-    for (const t of ["dead", "dead , emailed", "phone dead, emailed", "cut line, emailed"]) expect([t, st(t)]).toEqual([t, "不需要"]);
+  it("dead／phone dead → 唔通；cut line → 不需要（Kevin 2026-10-16：「cut line 不需要 / dead 唔通」）", () => {
+    for (const t of ["dead", "dead , emailed", "dead, emailed", "phone dead", "phone dead, emailed"]) expect([t, st(t)]).toEqual([t, "唔通"]);
+    expect(st("cut line, emailed")).toBe("不需要");
   });
 
   it("close／永久停業 → 已結業；❗「close,emailed」唔可以俾 emailed 嗰條食咗", () => {

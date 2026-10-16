@@ -15,7 +15,9 @@ NB-IoT／工業 SIM、CloudPhone、SME Bundle）做 **B2B 冷電**。呢個 repo
 - **第十粒「唔通」**（Kevin 2026-10-16「加個唔通按鈕」→ 佢揀「轉 唔通」）：電話打唔通（死線／錯號），**唔算接通**，
   公司轉**新狀態「唔通」**（`COMPANY_STATUSES` 加咗，唔出冷電名單，篩得返）。
   ❗「接通」嘅 SQL 而家用 `NOT_CONNECTED`（由 RULES 計），唔准再喺 SQL 寫死 `<> '沒有人接'` —— 寫死咗加新結果就數錯。
-  ❗名單匯入嘅 dead／phone dead／cut line 規則仲係 → 不需要（佢 10/16 拍板嗰陣未有「唔通」）；要轉唔轉做唔通，問佢。
+  ✅ 佢 10/16 答：「cut line 不需要 / dead 唔通」—— 匯入規則已改；production 嗰 44 間用一次性 migration
+  `20261016000400_import_dead_to_no_line.sql` 改（淨係郁仲係不需要＋匯入備註有 dead＋之後冇打過嘅，逐間入 audit）。
+  ❗大批改 production 資料用 migration 唔用 MCP：MCP 寫入每次都要 Kevin 撳批准，44 次會煩死佢；migration 有 test 行同一份檔。
 - **打完電話八粒掣**，名同次序照佢張單，一個都唔改：
   沒有人接 · 不需要 · 稍後再撥打 · 需要跟進 · 只接受電郵 · 已電郵 · 其他人跟進 · 幾點鐘再打。
   每粒掣做乜喺 `src/domain/outcomes.ts`（純函數，`tests/outcomes.test.ts` 逐粒釘死）。
