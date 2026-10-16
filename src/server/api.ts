@@ -206,6 +206,7 @@ export function filtersFrom(q: URLSearchParams): CompanyFilters {
   if (s("lastOutcome")) f.lastOutcome = s("lastOutcome");
   if (s("productId")) f.productId = parse(uuid, s("productId"));
   if (s("cold") === "1") f.cold = true;
+  if (s("id")) f.id = parse(uuid, s("id"));
   if (s("contractEndBy")) { assertDay(s("contractEndBy")); f.contractEndBy = s("contractEndBy"); }
   const sort = s("sort");
   if (["recent", "name", "code", "created", "contract_end", "never_called"].includes(sort)) {

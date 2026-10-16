@@ -198,3 +198,29 @@ th, td:first-child { white-space: nowrap; }
 #timeline .call, #timeline .remark { border-left: 3px solid transparent; padding-left: 10px; margin-left: -2px; }
 #timeline .call { border-left-color: var(--accent); }
 #timeline .remark { border-left-color: var(--line); }
+
+/* 公司清單每行（2026-10-16）：左邊資料＋電話，右邊最新備註＋結果掣 */
+.crow { padding: 12px 0; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.crow:last-child { border-bottom: 0; }
+.crow .name { font-weight: 600; color: var(--ink); text-decoration: none; }
+.crow .name:hover { color: var(--accent); }
+.crow .dials { margin: 6px 0 4px; }
+.crow .dial { padding: 6px 12px; min-height: 36px; font-size: .92rem; }
+.crow .stsel { width: auto; min-height: 30px; padding: 2px 6px; font-size: .85rem; }
+.crow textarea { min-height: 38px; margin: 4px 0; }
+.crow .followbox { display: flex; gap: 6px; margin-top: 6px; }
+.crow .followbox[hidden] { display: none; }
+.lastnote { background: var(--bg); border-radius: 8px; padding: 6px 8px; white-space: pre-wrap; word-break: break-word; }
+.qouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.qouts button { padding: 6px 4px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); cursor: pointer;
+                font-size: .82rem; min-height: 34px; }
+.qouts button:active { background: var(--accent-soft); }
+.qouts .addnote { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-mid); font-weight: 600; }
+.qextra { margin-top: 6px; }
+.qdone { margin-top: 4px; color: var(--ok); }
+.crow.gone { opacity: .55; }
+.crow.gone .qdone { color: var(--muted); opacity: 1; }
+@media (min-width: 900px) {
+  main { max-width: 1180px; }
+  .crow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+}

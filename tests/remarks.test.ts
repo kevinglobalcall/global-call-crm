@@ -45,3 +45,30 @@ describe("備註記錄", () => {
     await expect(t.sql`insert into public.company_remarks (company_id, body) values (${id}, '  ')`).rejects.toThrow(/check/);
   });
 });
+
+describe("公司清單嘅「最新一條」", () => {
+  it("有日期嘅（手寫備註、有內容嘅電話）邊個新出邊個；名單匯入嗰幾條冇日期，排最後、合埋一句", async () => {
+    const { listCompanies } = await import("../src/domain/companies.js");
+    const { logCall } = await import("../src/domain/calls.js");
+    const id = await makeCompany(t.sql);
+    await t.sql`insert into public.company_remarks (company_id, body, author, source) values
+      (${id}, 'no one answer, emailed', '名單匯入', 'import'),
+      (${id}, '聯絡人／補充跟進：Mr Wong', '名單匯入', 'import')`;
+    const pick = async () => (await listCompanies(t.sql, { id }, 5, 0)).rows[0]!.last_note;
+    expect(await pick()).toMatchObject({ kind: "import", text: "no one answer, emailed · 聯絡人／補充跟進：Mr Wong", at: null });
+
+    await logCall(t.sql, { companyId: id, outcome: "沒有人接" }); // 冇內容嘅電話唔算
+    expect((await pick())!.kind).toBe("import");
+
+    await logCall(t.sql, { companyId: id, outcome: "需要跟進", content: "IT 經理陳生" });
+    expect(await pick()).toMatchObject({ kind: "call", text: "IT 經理陳生", outcome: "需要跟進" });
+
+    await addRemark(t.sql, id, "前台話陳生放假");
+    expect(await pick()).toMatchObject({ kind: "remark", text: "前台話陳生放假", author: "Kevin" });
+
+    // id 篩選：淨係出嗰一間
+    const other = await makeCompany(t.sql);
+    const one = await listCompanies(t.sql, { id: other }, 50, 0);
+    expect([one.total, one.rows.map((r) => r.id), one.rows[0]!.last_note]).toEqual([1, [other], null]);
+  });
+});

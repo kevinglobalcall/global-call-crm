@@ -28,6 +28,8 @@ export interface CompanyFilters {
   /** 合約喺呢日或之前到期（D 資料） */
   contractEndBy?: string;
   sort?: "recent" | "name" | "code" | "created" | "contract_end" | "never_called";
+  /** 淨係攞一間（清單記完電話／改完狀態，重畫嗰一行用） */
+  id?: string;
 }
 
 export interface CompanyListRow {
@@ -59,6 +61,16 @@ export interface CompanyListRow {
   customer_type: string;
   br_no: string | null;
   website: string | null;
+  /** 清單「備註欄」：最新一條（備註或者有內容嘅電話；名單匯入嘅排最後，冇日期） */
+  last_note?: LastNote | null;
+}
+
+export interface LastNote {
+  kind: "remark" | "call" | "import";
+  text: string;
+  at: Date | null;
+  author: string | null;
+  outcome: string | null;
 }
 
 function where(sql: Sql, f: CompanyFilters) {
@@ -91,6 +103,7 @@ function where(sql: Sql, f: CompanyFilters) {
   if (f.mis === "no") parts.push(sql`not o.mis_checked`);
   if (f.called === "yes") parts.push(sql`o.call_count > 0`);
   if (f.called === "no") parts.push(sql`o.call_count = 0`);
+  if (f.id) parts.push(sql`o.id = ${f.id}`);
   if (f.cold) {
     parts.push(sql`o.status in ('未打', '跟進中') and nullif(btrim(o.followed_by), '') is null`);
   }
@@ -138,7 +151,35 @@ export async function listCompanies(
      where ${w}
      order by ${orderBy(sql, f.sort ?? (f.cold ? "never_called" : "recent"))}
      limit ${lim} offset ${off}`;
+  await attachLastNotes(sql, rows);
   return { rows, total: summary!.total, totalR: summary!.total_r, totalD: summary!.total_d };
+}
+
+/**
+ * 清單每行嘅「最新一條」：一句 query 攞晒呢頁幾十間（唔加落 view —— 11,800 間 count 已經 0.36 秒）。
+ * 有日期嘅（手寫備註、有內容嘅電話）邊個新出邊個；都冇先用名單匯入嗰幾條（冇日期，合埋一句）。
+ */
+async function attachLastNotes(sql: Sql, rows: CompanyListRow[]): Promise<void> {
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.id);
+  const notes = await sql<(LastNote & { company_id: string })[]>`
+    select distinct on (company_id) company_id, kind, text, at, author, outcome from (
+      select r.company_id, 'remark' as kind, r.body as text, r.created_at as at, r.author, null::text as outcome, 2 as pri
+        from public.company_remarks r where r.company_id = any(${ids}::uuid[]) and r.source <> 'import'
+      union all
+      select k.company_id, 'call', k.content, k.called_at, null, k.outcome, 2
+        from public.calls k where k.company_id = any(${ids}::uuid[]) and nullif(btrim(k.content), '') is not null
+      union all
+      select r.company_id, 'import', string_agg(r.body, ' · ' order by (r.body ~ '^[^：]{1,12}：'), r.body), null, '名單匯入', null, 1
+        from public.company_remarks r where r.company_id = any(${ids}::uuid[]) and r.source = 'import'
+       group by r.company_id
+    ) u
+    order by company_id, pri desc, at desc nulls last`;
+  const byId = new Map(notes.map((n) => [n.company_id, n]));
+  for (const r of rows) {
+    const n = byId.get(r.id);
+    r.last_note = n ? { kind: n.kind, text: n.text, at: n.at, author: n.author, outcome: n.outcome } : null;
+  }
 }
 
 /** 篩選選項：行業有邊幾個（由資料數出嚟，唔係寫死）。 */

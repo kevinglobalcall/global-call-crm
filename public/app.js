@@ -376,6 +376,8 @@
 
       var offset = 0;
       var seq = 0;
+      var ROWS = {};
+      wireRows($("#list"), m, ROWS, function () { return f; });
       function load(reset) {
         var my = ++seq;
         if (reset) offset = 0;
@@ -384,18 +386,8 @@
         return api("/companies?" + q + (q ? "&" : "") + "limit=50&offset=" + offset).then(function (r) {
           if (my !== seq) return; // 打字快過 server：舊結果唔好蓋新結果
           $("#summary").innerHTML = "共 <b>" + r.total + "</b> 間 · R <b>" + r.totalR + "</b> 間 · D <b>" + r.totalD + "</b> 間";
-          var rows = r.rows.map(function (c) {
-            return '<a class="item" href="#/c/' + esc(c.id) + '"><div class="spread"><span class="name">' + esc(nameOf(c)) +
-              (altName(c) ? ' <span class="muted small">' + esc(altName(c)) + "</span>" : "") + "</span>" +
-              '<span class="small muted">' + esc(c.code) + "</span></div>" +
-              '<div class="row small">' + statusPill(c.status) + " " + rd(c.ever_r, c.ever_d) +
-              (c.industry ? ' <span class="muted">' + esc(c.industry) + "</span>" : "") +
-              (c.call_count ? ' <span class="muted">打過 ' + c.call_count + " 次 · " + esc(c.last_outcome || "") + " " + esc(fmt(c.last_call_at, false)) + "</span>" : "") +
-              (c.d_contract_end ? ' <span class="pill d">' + esc(c.d_provider || "") + " 約滿 " + esc(c.d_contract_end) + "</span>" : "") +
-              (c.followed_by ? ' <span class="pill warn">' + esc(c.followed_by) + " 跟</span>" : "") +
-              (c.mis_checked ? "" : ' <span class="pill">MIS 未查</span>') +
-              "</div></a>";
-          }).join("");
+          r.rows.forEach(function (c) { ROWS[c.id] = c; });
+          var rows = r.rows.map(function (c) { return '<div class="crow" data-row="' + esc(c.id) + '">' + crowInner(c, m) + "</div>"; }).join("");
           if (reset) $("#list").innerHTML = rows || '<p class="muted">冇公司夾到</p>';
           else $("#list").insertAdjacentHTML("beforeend", rows);
           offset += r.rows.length;
@@ -425,6 +417,165 @@
       });
       $("#more").addEventListener("click", function () { load(false); });
       return load(true);
+    });
+  }
+
+  // ── 公司清單每行：直接打、記結果、改狀態、寫備註（Kevin 2026-10-16「直接顯示電話 email及tick狀態 備註欄」）──
+
+  /** overview 個 phones「23456789 / 23456790（傳真）」→ 撥號掣＋傳真字 */
+  function rowPhones(c) {
+    var parts = (c.phones || "").split(" / ").filter(Boolean);
+    if (!parts.length) return '<span class="muted small">冇電話</span>';
+    return parts.map(function (x) {
+      var fax = /（傳真）$/.test(x), n = x.replace(/（傳真）$/, "");
+      return fax ? '<span class="muted small">傳真 ' + esc(n.slice(0, 4) + " " + n.slice(4)) + "</span>" : dialLink(n);
+    }).join(" ");
+  }
+
+  function lastNoteHtml(n) {
+    if (!n) return '<span class="muted">未有備註</span>';
+    var head = n.kind === "import" ? "名單匯入" :
+      fmt(n.at) + (n.kind === "call" ? " · " + (n.outcome || "") : n.author ? " · " + n.author : "");
+    return '<b class="small">' + esc(head) + "</b> " + esc(n.text);
+  }
+
+  function crowInner(c, m) {
+    var emails = (c.emails || "").split(" / ").filter(Boolean);
+    return '<div class="cmain">' +
+      '<div class="spread"><a class="name" href="#/c/' + esc(c.id) + '">' + esc(nameOf(c)) +
+      (altName(c) ? ' <span class="muted small">' + esc(altName(c)) + "</span>" : "") + "</a>" +
+      '<span class="small muted">' + esc(c.code) + "</span></div>" +
+      '<div class="dials">' + rowPhones(c) + "</div>" +
+      (emails.length ? '<div class="small">' + emails.map(function (e) { return '<a href="mailto:' + esc(e) + '">' + esc(e) + "</a>"; }).join(" · ") + "</div>" : "") +
+      '<div class="row small"><select class="stsel" data-act="status" aria-label="狀態">' +
+      m.statuses.map(function (st) { return opt(st, st, c.status); }).join("") + "</select> " + rd(c.ever_r, c.ever_d) +
+      (c.industry ? ' <span class="muted">' + esc(c.industry) + "</span>" : "") +
+      (c.call_count ? ' <span class="muted">打過 ' + c.call_count + " 次 · " + esc(c.last_outcome || "") + " " + esc(fmt(c.last_call_at, false)) + "</span>" : "") +
+      (c.d_contract_end ? ' <span class="pill d">' + esc(c.d_provider || "") + " 約滿 " + esc(c.d_contract_end) + "</span>" : "") +
+      (c.followed_by ? ' <span class="pill warn">' + esc(c.followed_by) + " 跟</span>" : "") +
+      (c.mis_checked ? "" : ' <span class="pill">MIS 未查</span>') + "</div>" +
+      '<div class="followbox" hidden><input type="text" data-v="follower" placeholder="邊個同事跟緊（可以留空）">' +
+      '<button class="btn sm primary" data-act="follow-save">存</button></div></div>' +
+      '<div class="cact"><div class="lastnote small">' + lastNoteHtml(c.last_note) + "</div>" +
+      '<textarea data-v="note" rows="1" placeholder="備註／今次電話講咗乜"></textarea>' +
+      '<div class="qouts">' + m.outcomes.map(function (o) {
+        return '<button type="button" data-act="out" data-o="' + esc(o.outcome) + '">' + esc(o.outcome) + "</button>";
+      }).join("") + '<button type="button" class="addnote" data-act="note">加備註</button></div>' +
+      '<div class="qextra" hidden></div><div class="qdone small" hidden></div></div>';
+  }
+
+  /** 清單成個用一個 listener（行會重畫，唔使逐行再 wire） */
+  function wireRows(list, m, ROWS, filters) {
+    function rowOf(el) { return el.closest("[data-row]"); }
+    function ruleOf(o) { return m.outcomes.filter(function (x) { return x.outcome === o; })[0]; }
+    function refresh(row, done) {
+      var id = row.getAttribute("data-row");
+      var fq = filterQuery(filters());
+      return Promise.all([
+        api("/companies?id=" + encodeURIComponent(id) + "&limit=1"),
+        api("/companies?" + fq + (fq ? "&" : "") + "id=" + encodeURIComponent(id) + "&limit=1"),
+      ]).then(function (x) {
+        var c = x[0].rows[0];
+        if (!c) return;
+        ROWS[id] = c;
+        row.innerHTML = crowInner(c, m);
+        var gone = x[1].total === 0;
+        row.classList.toggle("gone", gone);
+        var msg = (done || "") + (gone ? (done ? " · " : "") + "已經唔喺呢個清單（而家：" + c.status + "）" : "");
+        if (msg) { var q = $(".qdone", row); q.innerHTML = msg; q.hidden = false; }
+      });
+    }
+    function logCall(row, outcome, extra) {
+      var id = row.getAttribute("data-row"), c = ROWS[id];
+      var note = $('[data-v="note"]', row).value.trim();
+      var body = { companyId: id, outcome: outcome, attemptNo: (c.call_count || 0) + 1, content: note || null,
+        callbackAt: (extra && extra.callbackAt) || null, otherFollower: (extra && extra.otherFollower) || null,
+        phoneDialed: ((c.phones || "").split(" / ").filter(function (p) { return !/傳真/.test(p); })[0] || null) };
+      $$("button", row).forEach(function (b) { b.disabled = true; });
+      return api("/calls", body).then(function (res) {
+        toast("記低咗：" + nameOf(c) + " 第 " + res.call.attempt_no + " 次 · " + res.call.outcome);
+        return refresh(row, "記低咗：第 " + res.call.attempt_no + " 次 · " + esc(res.call.outcome) +
+          ' <button class="btn sm" data-act="undo" data-call="' + esc(res.call.id) + '">撤回</button>');
+      }).catch(function (e) { $$("button", row).forEach(function (b) { b.disabled = false; }); toast(e.message, true); });
+    }
+    list.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-act]");
+      if (!b || b.tagName === "SELECT") return;
+      var row = rowOf(b);
+      if (!row) return;
+      var id = row.getAttribute("data-row");
+      var act = b.getAttribute("data-act");
+      var extraBox = $(".qextra", row);
+      if (act === "out") {
+        var o = b.getAttribute("data-o"), r = ruleOf(o);
+        if (r && r.time === "required") {
+          extraBox.innerHTML = '<div class="small muted">' + esc(o) + "：幾點再打？</div>" + '<div class="quick">' +
+            quickTimes(m.today).map(function (t) { return '<button type="button" class="btn sm" data-act="qtime" data-time="' + esc(t[1]) + '">' + esc(t[0]) + "</button>"; }).join("") +
+            '</div><div class="row"><input type="datetime-local" data-v="cb"><button class="btn sm primary" data-act="out-time" data-o="' + esc(o) + '">記低</button></div>';
+          extraBox.hidden = false;
+          return;
+        }
+        if (o === "其他人跟進") {
+          extraBox.innerHTML = '<div class="row"><input type="text" data-v="other" placeholder="邊個同事跟緊（一定要填）">' +
+            '<button class="btn sm primary" data-act="out-other">記低</button></div>';
+          extraBox.hidden = false;
+          return;
+        }
+        logCall(row, o);
+        return;
+      }
+      if (act === "qtime") { $('[data-v="cb"]', row).value = b.getAttribute("data-time"); return; }
+      if (act === "out-time") {
+        var cb = $('[data-v="cb"]', row).value;
+        if (!cb) { toast("「幾點鐘再打」一定要揀時間", true); return; }
+        logCall(row, b.getAttribute("data-o"), { callbackAt: cb });
+        return;
+      }
+      if (act === "out-other") {
+        var who = $('[data-v="other"]', row).value.trim();
+        if (!who) { toast("填埋邊個同事跟緊", true); return; }
+        logCall(row, "其他人跟進", { otherFollower: who });
+        return;
+      }
+      if (act === "note") {
+        var text = $('[data-v="note"]', row).value.trim();
+        if (!text) { toast("寫咗備註先撳", true); return; }
+        b.disabled = true;
+        api("/companies/" + id + "/remarks", { body: text }).then(function () {
+          toast("加咗備註");
+          return refresh(row, "加咗備註");
+        }).catch(function (er) { b.disabled = false; toast(er.message, true); });
+        return;
+      }
+      if (act === "undo") {
+        if (!confirm("撤回呢次電話記錄？")) return;
+        api("/calls/" + b.getAttribute("data-call") + "/delete", {}).then(function () {
+          toast("撤回咗");
+          return refresh(row, "撤回咗");
+        }).catch(function (er) { toast(er.message, true); });
+        return;
+      }
+      if (act === "follow-save") {
+        var name = $('[data-v="follower"]', row).value.trim();
+        api("/companies/" + id, { status: "其他人跟進", followed_by: name || null }).then(function () {
+          toast("改咗做其他人跟進");
+          return refresh(row, "狀態改咗做其他人跟進");
+        }).catch(function (er) { toast(er.message, true); });
+      }
+    });
+    list.addEventListener("change", function (e) {
+      var sel = e.target.closest('[data-act="status"]');
+      if (!sel) return;
+      var row = rowOf(sel), id = row.getAttribute("data-row"), before = ROWS[id].status;
+      if (sel.value === "其他人跟進") { $(".followbox", row).hidden = false; return; }
+      $(".followbox", row).hidden = true;
+      // 由「其他人跟進」改走 → 同事名一齊清，唔係佢會照樣唔出冷電名單
+      var patch = { status: sel.value };
+      if (ROWS[id].followed_by) patch.followed_by = null;
+      api("/companies/" + id, patch).then(function () {
+        toast("狀態：" + before + " → " + sel.value);
+        return refresh(row, "狀態：" + esc(before) + " → " + esc(sel.value));
+      }).catch(function (er) { sel.value = before; toast(er.message, true); });
     });
   }
 

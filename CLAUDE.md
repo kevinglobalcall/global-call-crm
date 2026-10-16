@@ -144,6 +144,16 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
   認唔到 24（加咗 ex／billing 之後 17）· 備註 526 條。commit 4 秒，**server RSS 峰值 426MB（Fly 512MB）**—— 再大一倍嘅檔要分開兩次或者加記憶體。
   ❗份真檔有客戶資料，**唔准入 repo（public）**，淨係擺 scratchpad。
 
+## 公司清單直接做嘢（Kevin 2026-10-16「我需要直接顯示電話 email及tick狀態 備註欄」）
+
+- 每行：撥號掣（傳真唔撥）、mailto、**狀態下拉**（改咗即存；由「其他人跟進」改走會清埋同事名，唔係照樣唔出冷電）、
+  **八粒結果掣**（撳一粒即記一次電話，格入面啲字做內容；幾點鐘再打要揀時間、其他人跟進要填名先送；記完出「撤回」）、
+  **最新一條**（`listCompanies` 嘅 `last_note`：有日期嘅備註／有內容嘅電話邊個新出邊個，名單匯入排最後）＋「加備註」。
+- 記完淨係重畫嗰一行（`/companies?id=`），唔重載成版；仲喺唔喺呢個清單用同一組篩選＋id 問一次，唔喺就灰咗唔即刻消失。
+- `last_note` 唔加落 view：本機 11,803 間實測冷電 count 0.24 秒，view 再加 lateral 只會更慢；一頁 50 間另外一句 query。
+- ❗**auto 模式下改 CRM 資料（MCP 寫入）仍然會問 Kevin 批准**，而我唔准自己改權限設定（self-modification 被擋）。
+  佢問「為什麼不停要允許」—— 答案係寫 production 資料嗰類動作；改 code、跑 test 唔會問。
+
 ## 外觀（Kevin 2026-10-15「使用官網配色方便手機瀏覽」）
 
 - **配色由官網 globalcall.com.hk 個 theme 抄**（`--wp--preset--color--*`），唔係估：主藍 `#046CB5`（＝logo 個藍）、

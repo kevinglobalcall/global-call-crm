@@ -337,6 +337,89 @@ describe("公司清單", () => {
   });
 });
 
+describe("公司清單每行：直接打、記結果、改狀態、寫備註（Kevin 2026-10-16）", () => {
+  const ROW = {
+    id: CID, code: "GC-00012", name_zh: "大發物流有限公司", name_en: "Tai Fat Logistics Ltd", status: "未打", ever_r: false, ever_d: false,
+    industry: "物流", call_count: 0, last_outcome: null, last_call_at: null, d_contract_end: null, d_provider: null,
+    followed_by: null, mis_checked: false, phones: "23456789 / 23456790（傳真）", emails: "info@taifat.hk",
+    last_note: { kind: "import", text: "no one answer, emailed", at: null, author: "名單匯入", outcome: null },
+  };
+  const LIST2 = { total: 1, totalR: 0, totalD: 0, rows: [ROW] };
+  const CALLED = { call: { id: "kkkkkkkk-0000-0000-0000-000000000009", attempt_no: 1, outcome: "沒有人接" },
+    statusBefore: "未打", statusAfter: "跟進中", closedTasks: 0, task: null };
+  const page = () => boot("#/companies?cold=1", { "/meta": META, "/companies": LIST2, "/calls": CALLED, "/remarks": { ok: true } });
+  const row = (d: Document) => d.querySelector(`[data-row="${CID}"]`)!;
+
+  it("一行出齊：撥號掣（傳真唔撥）、電郵 mailto、狀態下拉、最新備註（匯入嗰條寫名單匯入）", async () => {
+    const { d } = await page();
+    await tick();
+    const r = row(d);
+    expect([...r.querySelectorAll('a[href^="tel:"]')].map((a) => a.getAttribute("href"))).toEqual(["tel:+85223456789"]);
+    expect(r.textContent).toContain("傳真 2345 6790");
+    expect(r.querySelector('a[href="mailto:info@taifat.hk"]')).toBeTruthy();
+    expect((r.querySelector('[data-act="status"]') as HTMLSelectElement).value).toBe("未打");
+    expect(r.querySelector(".lastnote")!.textContent).toBe("名單匯入 no one answer, emailed");
+    expect(r.querySelectorAll('[data-act="out"]').length).toBe(8);
+  });
+
+  it("撳「沒有人接」→ 即刻記電話：帶公司、第 1 次、格入面啲字做內容", async () => {
+    const { d, posts } = await page();
+    await tick();
+    const r = row(d);
+    (r.querySelector('[data-v="note"]') as HTMLTextAreaElement).value = "響咗十聲";
+    click(r.querySelector('[data-o="沒有人接"]'));
+    await tick(5);
+    expect(posts().at(-1)).toMatchObject({ url: "/app/api/calls",
+      body: { companyId: CID, outcome: "沒有人接", attemptNo: 1, content: "響咗十聲", phoneDialed: "23456789" } });
+    // 記完重攞嗰一行（帶 id），唔係成版重載
+    await tick(5);
+    expect(row(d).querySelector(".qdone")!.textContent).toContain("記低咗：第 1 次 · 沒有人接");
+    expect(row(d).querySelector('[data-act="undo"]')).toBeTruthy();
+  });
+
+  it("❗「幾點鐘再打」冇揀時間唔送；揀咗先送香港時間", async () => {
+    const { d, posts } = await page();
+    await tick();
+    const r = row(d);
+    click(r.querySelector('[data-o="幾點鐘再打"]'));
+    expect(posts().length).toBe(0);
+    click(r.querySelector('[data-act="out-time"]'));
+    expect(posts().length).toBe(0);
+    click(r.querySelector('[data-act="qtime"][data-time="2026-10-15T10:00"]'));
+    click(r.querySelector('[data-act="out-time"]'));
+    await tick(5);
+    expect(posts().at(-1)).toMatchObject({ url: "/app/api/calls", body: { outcome: "幾點鐘再打", callbackAt: "2026-10-15T10:00" } });
+  });
+
+  it("❗「其他人跟進」唔填同事名唔送", async () => {
+    const { d, posts } = await page();
+    await tick();
+    const r = row(d);
+    click(r.querySelector('[data-o="其他人跟進"]'));
+    click(r.querySelector('[data-act="out-other"]'));
+    expect(posts().length).toBe(0);
+    (r.querySelector('[data-v="other"]') as HTMLInputElement).value = "阿明";
+    click(r.querySelector('[data-act="out-other"]'));
+    await tick(5);
+    expect(posts().at(-1)).toMatchObject({ body: { outcome: "其他人跟進", otherFollower: "阿明" } });
+  });
+
+  it("加備註 POST 去嗰間；改狀態下拉即刻存", async () => {
+    const { d, posts } = await page();
+    await tick();
+    const r = row(d);
+    (r.querySelector('[data-v="note"]') as HTMLTextAreaElement).value = "Left phone number to reception";
+    click(r.querySelector('[data-act="note"]'));
+    await tick(5);
+    expect(posts().at(-1)).toMatchObject({ url: `/app/api/companies/${CID}/remarks`, body: { body: "Left phone number to reception" } });
+    const sel = row(d).querySelector('[data-act="status"]') as HTMLSelectElement;
+    sel.value = "不需要";
+    sel.dispatchEvent(new d.defaultView!.Event("change", { bubbles: true }));
+    await tick(5);
+    expect(posts().at(-1)).toMatchObject({ url: `/app/api/companies/${CID}`, body: { status: "不需要" } });
+  });
+});
+
 // ── 匯入、新增 ─────────────────────────────────────────────────────────────
 
 describe("匯入", () => {
