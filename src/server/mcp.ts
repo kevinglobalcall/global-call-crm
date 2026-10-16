@@ -17,8 +17,8 @@ import {
 } from "../domain/appointments.js";
 import { logCall } from "../domain/calls.js";
 import {
-  createCompany, emailsFromText, getCompany, listCompanies, phonesFromText, updateCompany,
-  type CompanyInput, type CompanyListRow,
+  addContact, createCompany, emailsFromText, getCompany, listCompanies, phonesFromText, updateCompany, updateContact,
+  type CompanyInput, type CompanyListRow, type ContactInput,
 } from "../domain/companies.js";
 import { COMPANY_STATUSES, OUTCOMES, RULES } from "../domain/outcomes.js";
 import { listProducts } from "../domain/products.js";
@@ -192,6 +192,34 @@ export function buildMcpServer(getSql: () => Sql, now: () => Date = () => new Da
     if ("candidates" in r) return { needChoice: true, candidates: r.candidates };
     const row = await addRemark(sql, r.id, a.text, "mcp");
     return { saved: true, when: fmtHk(row.created_at), by: row.author, text: row.body };
+  })());
+
+  server.registerTool("add_contact", {
+    title: "記低聯絡人／R 負責人",
+    description: "記低公司個聯絡人，預設當佢係 R（負責人），例如「GC-07899 嘅 R 係 Derek Shao」。同一間公司已經有同名嘅人就改返佢（唔會開兩個）。❗淨係記低 R 係邊個，唔會當咗今次搵到 R —— 傾到負責人要喺 log_call 畀 reachedR。",
+    inputSchema: {
+      company: z.string().describe("GC-00012、id 或者名"),
+      name: z.string().min(1).max(200),
+      title: z.string().max(200).optional().describe("職位"),
+      phone: z.string().max(100).optional().describe("直線／手提"),
+      email: z.string().max(200).optional(),
+      isR: z.boolean().optional().describe("係咪負責人（預設係）"),
+    },
+  }, async (a) => run(async (sql) => {
+    const r = await resolveCompany(sql, a.company);
+    if ("candidates" in r) return { needChoice: true, candidates: r.candidates };
+    const [same] = await sql<{ id: string }[]>`
+      select id from public.contacts where company_id = ${r.id} and public.nospace(name) = ${nospace(a.name)} limit 1`;
+    // 冇講嘅欄唔郁（改返舊人嗰陣唔好清走佢本身個電話）
+    const patch: ContactInput = { name: a.name, is_decision_maker: a.isR ?? true };
+    if (a.title !== undefined) patch.title = a.title;
+    if (a.phone !== undefined) patch.phone = a.phone;
+    if (a.email !== undefined) patch.email = a.email;
+    let id: string;
+    if (same) { await updateContact(sql, same.id, patch, "mcp"); id = same.id; }
+    else id = await addContact(sql, r.id, patch, "mcp");
+    const [row] = await sql`select name, title, phone, email, is_decision_maker from public.contacts where id = ${id}`;
+    return { saved: true, updatedExisting: Boolean(same), contact: row };
   })());
 
   server.registerTool("log_call", {

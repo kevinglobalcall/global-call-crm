@@ -456,6 +456,32 @@
     }).join("");
   }
 
+  /**
+   * R 負責人格（Kevin 2026-10-16「要有位置輸入R資料 例如這間公司的R是DEREK SHAO」）。
+   * 寫入 contacts（is_decision_maker）—— 同公司頁「聯絡人」同一份，全站搜尋搵得返個名。
+   * ❗淨係記低「R 係邊個」，唔會當咗搵到 R：R 數字照舊由電話記錄計（前台講個名唔等於傾到負責人）。
+   * 未有 R 就直接出格；有咗就收埋，撳「＋R」先出。
+   */
+  function rBoxHtml(c) {
+    var list = c.contacts || [];
+    var hasR = list.some(function (k) { return k.is_decision_maker; });
+    var lines = list.map(function (k) {
+      var digits = (k.phone || "").replace(/[^0-9]/g, "");
+      var ph = !k.phone ? "" : /^[2-9][0-9]{7}$/.test(digits) ? " " + dialLink(digits) : ' <span class="muted">' + esc(k.phone) + "</span>";
+      return '<div class="rline" data-k="' + esc(k.id) + '">' + (k.is_decision_maker ? '<span class="pill r">R</span> ' : '<span class="pill">聯絡人</span> ') +
+        "<b>" + esc(k.name) + "</b>" + (k.title ? ' <span class="muted">' + esc(k.title) + "</span>" : "") + ph +
+        (k.email ? ' <a href="mailto:' + esc(k.email) + '">' + esc(k.email) + "</a>" : "") +
+        ' <button type="button" class="btn sm" data-act="r-edit">' + (k.is_decision_maker ? "改" : "設做 R") + "</button></div>";
+    }).join("");
+    return '<div class="rbox small">' + lines +
+      (hasR ? '<button type="button" class="btn sm" data-act="r-add">＋R</button>' : "") +
+      '<div class="rform"' + (hasR ? " hidden" : "") + '><span class="pill r">R</span>' +
+      '<input type="text" data-v="rname" placeholder="R 負責人名" aria-label="R 負責人名">' +
+      '<input type="text" data-v="rtitle" placeholder="職位" aria-label="職位">' +
+      '<input type="text" data-v="rphone" placeholder="直線／手提" aria-label="R 電話">' +
+      '<button type="button" class="btn sm primary" data-act="r-save">存 R</button></div></div>';
+  }
+
   function crowInner(c, m) {
     var emails = (c.emails || "").split(" / ").filter(Boolean);
     return '<div class="cmain">' +
@@ -474,7 +500,7 @@
       (c.followed_by ? ' <span class="pill warn">' + esc(c.followed_by) + " 跟</span>" : "") +
       (c.mis_checked ? "" : ' <span class="pill">MIS 未查</span>') + "</div>" +
       '<div class="followbox" hidden><input type="text" data-v="follower" placeholder="邊個同事跟緊（可以留空）">' +
-      '<button class="btn sm primary" data-act="follow-save">存</button></div></div>' +
+      '<button class="btn sm primary" data-act="follow-save">存</button></div>' + rBoxHtml(c) + "</div>" +
       '<div class="cact"><div class="lastnote small">' + notesHtml(c) + "</div>" +
       '<textarea data-v="note" rows="1" placeholder="備註／今次電話講咗乜"></textarea>' +
       '<div class="qouts">' + m.outcomes.map(function (o) {
@@ -613,6 +639,18 @@
         }).catch(function (er) { toast(er.message, true); });
         return;
       }
+      if (act === "r-add" || act === "r-edit") {
+        var form = $(".rform", row), line = b.closest("[data-k]");
+        var k = line ? (ROWS[id].contacts || []).filter(function (x) { return x.id === line.getAttribute("data-k"); })[0] : null;
+        form.setAttribute("data-k", k ? k.id : "");
+        $('[data-v="rname"]', form).value = k ? k.name : "";
+        $('[data-v="rtitle"]', form).value = k && k.title ? k.title : "";
+        $('[data-v="rphone"]', form).value = k && k.phone ? k.phone : "";
+        form.hidden = false;
+        $('[data-v="rname"]', form).focus();
+        return;
+      }
+      if (act === "r-save") { saveR(row); return; }
       if (act === "follow-save") {
         var name = $('[data-v="follower"]', row).value.trim();
         api("/companies/" + id, { status: "其他人跟進", followed_by: name || null }).then(function () {
@@ -621,6 +659,25 @@
           return refresh(row, "狀態改咗做其他人跟進").then(function () { jumpNext(row); });
         }).catch(function (er) { toast(er.message, true); });
       }
+    });
+    function saveR(row) {
+      var id = row.getAttribute("data-row"), form = $(".rform", row);
+      var name = $('[data-v="rname"]', form).value.trim();
+      if (!name) { toast("填咗 R 個名先存", true); $('[data-v="rname"]', form).focus(); return; }
+      var body = { name: name, title: $('[data-v="rtitle"]', form).value.trim() || null,
+        phone: $('[data-v="rphone"]', form).value.trim() || null, is_decision_maker: true };
+      var kid = form.getAttribute("data-k");
+      var btn = $('[data-act="r-save"]', form);
+      btn.disabled = true;
+      api(kid ? "/contacts/" + kid : "/companies/" + id + "/contacts", body).then(function () {
+        toast("記低咗 R：" + name);
+        return refresh(row, "記低咗 R：" + esc(name));
+      }).catch(function (er) { btn.disabled = false; toast(er.message, true); });
+    }
+    list.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" || !e.target.closest(".rform input")) return;
+      e.preventDefault();
+      saveR(rowOf(e.target));
     });
     list.addEventListener("change", function (e) {
       var sel = e.target.closest('[data-act="status"]');

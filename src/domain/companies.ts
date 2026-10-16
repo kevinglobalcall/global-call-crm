@@ -65,6 +65,17 @@ export interface CompanyListRow {
   last_note?: LastNote | null;
   /** 清單「備註欄」顯示晒（Kevin 2026-10-16「顯示所有備註」）：備註＋每次電話，新嘅行先，名單匯入最尾 */
   history?: LastNote[];
+  /** 清單「R 負責人」格（Kevin 2026-10-16「要有位置輸入R資料」）：負責人行先，之後先到其他聯絡人 */
+  contacts?: ListContact[];
+}
+
+export interface ListContact {
+  id: string;
+  name: string;
+  title: string | null;
+  phone: string | null;
+  email: string | null;
+  is_decision_maker: boolean;
 }
 
 export interface LastNote {
@@ -159,6 +170,7 @@ export async function listCompanies(
      limit ${lim} offset ${off}`;
   await attachLastNotes(sql, rows);
   await attachAllNotes(sql, rows);
+  await attachContacts(sql, rows);
   return { rows, total: summary!.total, totalR: summary!.total_r, totalD: summary!.total_d };
 }
 
@@ -187,6 +199,23 @@ async function attachLastNotes(sql: Sql, rows: CompanyListRow[]): Promise<void> 
     const n = byId.get(r.id);
     r.last_note = n ? { kind: n.kind, text: n.text, at: n.at, author: n.author, outcome: n.outcome } : null;
   }
+}
+
+/** 清單每行嘅聯絡人：負責人（R）行先，同級舊嘅行先 —— 一頁幾十間一句 query。 */
+async function attachContacts(sql: Sql, rows: CompanyListRow[]): Promise<void> {
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.id);
+  const all = await sql<(ListContact & { company_id: string })[]>`
+    select company_id, id, name, title, phone, email, is_decision_maker from public.contacts
+     where company_id = any(${ids}::uuid[])
+     order by company_id, is_decision_maker desc, created_at, id`;
+  const by = new Map<string, ListContact[]>();
+  for (const k of all) {
+    const list = by.get(k.company_id) ?? [];
+    list.push({ id: k.id, name: k.name, title: k.title, phone: k.phone, email: k.email, is_decision_maker: k.is_decision_maker });
+    by.set(k.company_id, list);
+  }
+  for (const r of rows) r.contacts = by.get(r.id) ?? [];
 }
 
 /** 篩選選項：行業有邊幾個（由資料數出嚟，唔係寫死）。 */

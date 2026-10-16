@@ -210,6 +210,14 @@ th, td:first-child { white-space: nowrap; }
 .crow textarea { min-height: 38px; margin: 4px 0; }
 .crow .followbox { display: flex; gap: 6px; margin-top: 6px; }
 .crow .followbox[hidden] { display: none; }
+/* R 負責人格 */
+.crow .rbox { margin-top: 8px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.crow .rline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.crow .rline .dial { padding: 2px 8px; min-height: 28px; font-size: .85rem; }
+.crow .rform { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; }
+.crow .rform[hidden] { display: none; }
+.crow .rform input { flex: 1 1 120px; min-width: 0; }
+.crow .rform input[data-v="rname"] { flex: 2 1 160px; }
 .lastnote { background: var(--bg); border-radius: 8px; padding: 6px 8px; white-space: pre-wrap; word-break: break-word; }
 .qouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .qouts button { padding: 6px 4px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); cursor: pointer;

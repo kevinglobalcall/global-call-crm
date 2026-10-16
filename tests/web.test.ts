@@ -566,6 +566,75 @@ describe("公司清單每行：直接打、記結果、改狀態、寫備註（K
   });
 });
 
+describe("公司清單每行：R 負責人格（Kevin 2026-10-16「要有位置輸入R資料」）", () => {
+  const KID = "cccccccc-0000-0000-0000-000000000001";
+  const base = {
+    id: CID, code: "GC-07899", name_zh: "萬友富士自動販賣機", name_en: "Vanyu-Fuji Vending Machine", status: "不需要", ever_r: false,
+    ever_d: false, industry: null, call_count: 1, last_outcome: "不需要", last_call_at: null, d_contract_end: null, d_provider: null,
+    followed_by: null, mis_checked: false, phones: "26270200", emails: "", last_note: null,
+  };
+  const page = (rowData: Record<string, unknown>) => boot("#/companies?q=Vanyu", {
+    "/meta": META, "/companies": { total: 1, totalR: 0, totalD: 0, rows: [rowData] }, "/contacts": { ok: true },
+  });
+  const row = (d: Document) => d.querySelector(`[data-row="${CID}"]`)!;
+  const R = { id: KID, name: "DEREK SHAO", title: "IT Manager", phone: "9876 5432", email: "derek@vanyu.hk", is_decision_maker: true };
+
+  it("未有 R：格直接出；冇名唔送；填齊 → 加去嗰間公司、當負責人", async () => {
+    const { d, posts } = await page({ ...base, contacts: [] });
+    await tick();
+    const f = row(d).querySelector(".rform") as HTMLElement;
+    expect(f.hidden).toBe(false);
+    const n0 = posts().length;
+    click(f.querySelector('[data-act="r-save"]'));
+    await tick(5);
+    expect(posts().length).toBe(n0);
+    (f.querySelector('[data-v="rname"]') as HTMLInputElement).value = "DEREK SHAO";
+    (f.querySelector('[data-v="rtitle"]') as HTMLInputElement).value = "IT Manager";
+    click(f.querySelector('[data-act="r-save"]'));
+    await tick(5);
+    expect(posts().at(-1)).toMatchObject({
+      url: `/app/api/companies/${CID}/contacts`, body: { name: "DEREK SHAO", title: "IT Manager", phone: null, is_decision_maker: true },
+    });
+  });
+
+  it("有 R：出 R 標、個名、職位、直線撳得打；格收埋；撳「改」預填 → Enter 存返嗰個人", async () => {
+    const { d, posts } = await page({ ...base, contacts: [R, { ...R, id: "cccccccc-0000-0000-0000-000000000002", name: "前台 Amy", title: null, phone: null, email: null, is_decision_maker: false }] });
+    await tick();
+    const r = row(d);
+    const line = r.querySelector(`[data-k="${KID}"]`)!;
+    expect(line.querySelector(".pill.r")!.textContent).toBe("R");
+    expect(line.textContent).toContain("DEREK SHAO");
+    expect(line.textContent).toContain("IT Manager");
+    expect(line.querySelector("a.dial")!.getAttribute("href")).toBe("tel:+85298765432");
+    expect(r.querySelector('[data-k="cccccccc-0000-0000-0000-000000000002"] [data-act="r-edit"]')!.textContent).toBe("設做 R");
+    const f = r.querySelector(".rform") as HTMLElement;
+    expect(f.hidden).toBe(true);
+    click(line.querySelector('[data-act="r-edit"]'));
+    expect(f.hidden).toBe(false);
+    const name = f.querySelector('[data-v="rname"]') as HTMLInputElement;
+    expect(name.value).toBe("DEREK SHAO");
+    expect((f.querySelector('[data-v="rphone"]') as HTMLInputElement).value).toBe("9876 5432");
+    name.value = "Derek Shao";
+    name.dispatchEvent(new d.defaultView!.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await tick(5);
+    expect(posts().at(-1)).toMatchObject({ url: `/app/api/contacts/${KID}`, body: { name: "Derek Shao", title: "IT Manager", is_decision_maker: true } });
+  });
+
+  it("❗撳「＋R」係開新人，唔係改返上一個", async () => {
+    const { d, posts } = await page({ ...base, contacts: [R] });
+    await tick();
+    const r = row(d);
+    click(r.querySelector('[data-act="r-edit"]'));
+    click(r.querySelector('[data-act="r-add"]'));
+    const f = r.querySelector(".rform") as HTMLElement;
+    expect((f.querySelector('[data-v="rname"]') as HTMLInputElement).value).toBe("");
+    (f.querySelector('[data-v="rname"]') as HTMLInputElement).value = "Ken Lee";
+    click(f.querySelector('[data-act="r-save"]'));
+    await tick(5);
+    expect(posts().at(-1)).toMatchObject({ url: `/app/api/companies/${CID}/contacts`, body: { name: "Ken Lee" } });
+  });
+});
+
 // ── 匯入、新增 ─────────────────────────────────────────────────────────────
 
 describe("匯入", () => {

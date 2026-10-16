@@ -165,6 +165,10 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
   淨係 http／https 先做連結（匯入嘅字唔准變 `javascript:`）。加咗落主畫面（PWA）用 window.open，唔係 iPhone 會成個 app 走咗去。
 - 記完淨係重畫嗰一行（`/companies?id=`），唔重載成版；仲喺唔喺呢個清單用同一組篩選＋id 問一次，唔喺就灰咗唔即刻消失。
 - `last_note` 唔加落 view：本機 11,803 間實測冷電 count 0.24 秒，view 再加 lateral 只會更慢；一頁 50 間另外一句 query。
+- **R 負責人格**（Kevin「要有位置輸入R資料 例如這間公司的R是DEREK SHAO」）：每行左邊，寫入 `contacts`
+  （`is_decision_maker`）—— 同公司頁「聯絡人」同一份，全站搜尋搵得返個名。未有 R 直接出格（名／職位／直線），
+  有咗就出「R 名 · 職位 · 撥號」＋「改」，再加人撳「＋R」；Enter 即存。MCP `add_contact`（同名就改返嗰個人）。
+  ❗**記低 R 係邊個唔等於搵到 R**：`ever_r`／R 數字照舊由電話記錄嘅 reachedR 計（前台講個名唔算傾到負責人）。
 - ❗**auto 模式下改 CRM 資料（MCP 寫入）仍然會問 Kevin 批准**，而我唔准自己改權限設定（self-modification 被擋）。
   佢問「為什麼不停要允許」—— 答案係寫 production 資料嗰類動作；改 code、跑 test 唔會問。
 
