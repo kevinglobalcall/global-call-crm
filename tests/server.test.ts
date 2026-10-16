@@ -155,8 +155,9 @@ describe("冷電成條路（經 API）", () => {
     });
     expect(call.status).toBe(200);
     expect(call.j).toMatchObject({ statusBefore: "未打", statusAfter: "跟進中", connected: true });
-    const [row] = await t.sql`select attempt_no, reached_r, got_d, called_at, d_provider from public.calls where company_id = ${created.id}`;
-    expect(row).toMatchObject({ attempt_no: 1, reached_r: true, got_d: true, d_provider: "CSL" });
+    const [row] = await t.sql`select k.attempt_no, k.reached_r, k.got_d, k.called_at, cc.provider from public.calls k
+                                left join public.call_carriers cc on cc.call_id = k.id where k.company_id = ${created.id}`;
+    expect(row).toMatchObject({ attempt_no: 1, reached_r: true, got_d: true, provider: "CSL" });
     expect((row!.called_at as Date).toISOString()).toBe("2026-10-14T02:00:00.000Z");
     const [task] = await t.sql`select kind, due_at from public.tasks where company_id = ${created.id} and status = '待辦'`;
     expect(task!.kind).toBe("回撥");
@@ -346,9 +347,10 @@ describe("claude.ai connector", () => {
     expect(r.body.newTask.due).toBe("10/20（二）15:00");
     expect(r.body.interestedProducts).toEqual(["SME Bundle — Business Connect"]);
     const [row] = await t.sql`
-      select k.reached_r, k.got_d, k.d_price, k.d_contract_end from public.calls k
-        join public.companies c on c.id = k.company_id where c.code = ${code}`;
-    expect(row).toMatchObject({ reached_r: true, got_d: true, d_price: "$198/月 × 12 條", d_contract_end: "2027-03-31" });
+      select k.reached_r, k.got_d, cc.price, cc.contract_end::text as contract_end from public.calls k
+        join public.companies c on c.id = k.company_id
+        join public.call_carriers cc on cc.call_id = k.id where c.code = ${code}`;
+    expect(row).toMatchObject({ reached_r: true, got_d: true, price: "$198/月 × 12 條", contract_end: "2027-03-31" });
     const [a] = await t.sql`select actor from public.audit_log where action = 'log_call' order by at desc limit 1`;
     expect(a!.actor).toBe("claude");
   });
@@ -442,8 +444,9 @@ describe("續約（經 API）", () => {
   it("D 到期 60 日內 → 出；收埋 → 唔出", async () => {
     const cookie = await login();
     const id = await makeCompany(t.sql, { name_zh: "API 續約公司" });
-    await t.sql`insert into public.calls (company_id, called_at, attempt_no, outcome, reached_r, got_d, d_contract_end, d_provider)
-                values (${id}, '2026-05-01T02:00:00Z', 1, '需要跟進', true, true, '2026-12-13', 'SmarTone')`;
+    const [k] = await t.sql<{ id: string }[]>`insert into public.calls (company_id, called_at, attempt_no, outcome, reached_r, got_d)
+                values (${id}, '2026-05-01T02:00:00Z', 1, '需要跟進', true, true) returning id`;
+    await t.sql`insert into public.call_carriers (call_id, provider, contract_end) values (${k!.id}, 'SmarTone', '2026-12-13')`;
     const r = await api(cookie, "/renewals");
     const hit = (r.j.rows as { company_id: string; stage: number; days_left: number; provider: string }[]).find((x) => x.company_id === id)!;
     expect(hit).toMatchObject({ stage: 1, days_left: 60, provider: "SmarTone" });

@@ -121,6 +121,8 @@ const ApptPatch = z.object({
   contactId: uuid.nullable().optional(),
 });
 
+const CarrierBody = z.object({ provider: optText, contractEnd: optText, price: optText, plan: optText });
+
 const CallBody = z.object({
   companyId: uuid,
   outcome: z.enum(OUTCOMES),
@@ -128,6 +130,7 @@ const CallBody = z.object({
   content: optText,
   reachedR: z.boolean().optional(),
   gotD: z.boolean().optional(),
+  carriers: z.array(CarrierBody).max(20).nullable().optional(),
   dContractEnd: optText,
   dPrice: optText,
   dPlan: optText,
@@ -142,10 +145,7 @@ const CallPatch = z.object({
   content: optText,
   reachedR: z.boolean().optional(),
   gotD: z.boolean().optional(),
-  dContractEnd: optText,
-  dPrice: optText,
-  dPlan: optText,
-  dProvider: optText,
+  carriers: z.array(CarrierBody).max(20).nullable().optional(),
   attemptNo: z.number().int().min(1).optional(),
 });
 

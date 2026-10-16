@@ -10,7 +10,7 @@
  *   6. audit_log
  */
 
-import { one, toJson, type Sql } from "../db/client.js";
+import { one, toJson, type Sql, type SqlOrTx } from "../db/client.js";
 import { blankToNull } from "../lib/text.js";
 import { assertDay } from "../lib/time.js";
 import {
@@ -29,6 +29,9 @@ export interface LogCallInput {
   content?: string | null;
   reachedR?: boolean;
   gotD?: boolean;
+  /** D：用緊邊幾個台（Kevin「要可以加不只一間電訊商」），一行一個 */
+  carriers?: CarrierInput[] | null;
+  /** 舊寫法：淨係一個台（MCP／舊 client 用）—— 會變做 carriers 第一行 */
   dContractEnd?: string | null;
   dPrice?: string | null;
   dPlan?: string | null;
@@ -50,14 +53,77 @@ export interface CallRow {
   content: string | null;
   reached_r: boolean;
   got_d: boolean;
-  d_contract_end: string | null;
-  d_price: string | null;
-  d_plan: string | null;
-  d_provider: string | null;
   other_follower: string | null;
   phone_dialed: string | null;
   contact_id: string | null;
   created_at: Date;
+  /** 呢次電話講到嘅台（getCompany／logCall 會帶埋） */
+  carriers?: CarrierRow[];
+}
+
+export interface CarrierInput {
+  provider?: string | null | undefined;
+  contractEnd?: string | null | undefined;
+  price?: string | null | undefined;
+  plan?: string | null | undefined;
+}
+
+export interface CarrierRow {
+  id: string;
+  call_id: string;
+  provider: string | null;
+  contract_end: string | null;
+  price: string | null;
+  plan: string | null;
+  sort: number;
+}
+
+/** 清走空行、驗日子；舊寫法（d* 四個欄）變做第一行。 */
+export function normalizeCarriers(
+  list: CarrierInput[] | null | undefined,
+  legacy?: { dProvider?: string | null; dContractEnd?: string | null; dPrice?: string | null; dPlan?: string | null },
+): { provider: string | null; contract_end: string | null; price: string | null; plan: string | null }[] {
+  const all: CarrierInput[] = [];
+  if (legacy) {
+    all.push({ provider: legacy.dProvider ?? null, contractEnd: legacy.dContractEnd ?? null,
+      price: legacy.dPrice ?? null, plan: legacy.dPlan ?? null });
+  }
+  all.push(...(list ?? []));
+  const out = [];
+  for (const c of all) {
+    const row = {
+      provider: blankToNull(c.provider), contract_end: blankToNull(c.contractEnd),
+      price: blankToNull(c.price), plan: blankToNull(c.plan),
+    };
+    if (!row.provider && !row.contract_end && !row.price && !row.plan) continue;
+    if (row.contract_end) assertDay(row.contract_end);
+    out.push(row);
+  }
+  if (out.length > 20) throw new Error("一次電話最多記 20 個台");
+  return out;
+}
+
+async function insertCarriers(tx: SqlOrTx, callId: string, lines: ReturnType<typeof normalizeCarriers>): Promise<CarrierRow[]> {
+  const rows: CarrierRow[] = [];
+  for (const [i, l] of lines.entries()) {
+    rows.push(one(await tx<CarrierRow[]>`
+      insert into public.call_carriers (call_id, provider, contract_end, price, plan, sort)
+      values (${callId}, ${l.provider}, ${l.contract_end}, ${l.price}, ${l.plan}, ${i})
+      returning id, call_id, provider, contract_end::text, price, plan, sort`, "啱啱寫入嘅台"));
+  }
+  return rows;
+}
+
+/** 一批電話記錄掛返佢哋嘅台（一句 query）。 */
+export async function attachCarriers<T extends { id: string; carriers?: CarrierRow[] }>(sql: SqlOrTx, calls: T[]): Promise<T[]> {
+  if (!calls.length) return calls;
+  const rows = await sql<CarrierRow[]>`
+    select id, call_id, provider, contract_end::text, price, plan, sort from public.call_carriers
+     where call_id = any(${calls.map((k) => k.id)}::uuid[]) order by call_id, sort, created_at`;
+  const by = new Map<string, CarrierRow[]>();
+  for (const r of rows) by.set(r.call_id, [...(by.get(r.call_id) ?? []), r]);
+  for (const k of calls) k.carriers = by.get(k.id) ?? [];
+  return calls;
 }
 
 export interface LogCallResult {
@@ -79,13 +145,9 @@ export async function logCall(sql: Sql, input: LogCallInput, actor = "web"): Pro
     attemptNo: input.attemptNo ?? null,
   });
   const outcome = input.outcome as Outcome;
-  const dContractEnd = blankToNull(input.dContractEnd);
-  if (dContractEnd) assertDay(dContractEnd);
-  const dPrice = blankToNull(input.dPrice);
-  const dPlan = blankToNull(input.dPlan);
-  const dProvider = blankToNull(input.dProvider);
-  // 填咗任何一樣 D 資料就自動算 D（UI 都會自動剔，呢度再保一次）
-  const gotD = Boolean(input.gotD) || Boolean(dContractEnd || dPrice || dPlan || dProvider);
+  const lines = normalizeCarriers(input.carriers, input);
+  // 填咗任何一個台嘅資料就自動算 D（UI 都會自動剔，呢度再保一次）
+  const gotD = Boolean(input.gotD) || lines.length > 0;
 
   return sql.begin(async (tx) => {
     const [co] = await tx<{ id: string; status: CompanyStatus }[]>`
@@ -102,14 +164,13 @@ export async function logCall(sql: Sql, input: LogCallInput, actor = "web"): Pro
     const call = one(await tx<CallRow[]>`
       insert into public.calls (
         company_id, contact_id, called_at, attempt_no, outcome, callback_at, content,
-        reached_r, got_d, d_contract_end, d_price, d_plan, d_provider,
-        other_follower, phone_dialed
+        reached_r, got_d, other_follower, phone_dialed
       ) values (
         ${co.id}, ${blankToNull(input.contactId)}, ${input.calledAt ?? new Date()}, ${attemptNo},
         ${outcome}, ${callbackAt}, ${blankToNull(input.content)},
-        ${Boolean(input.reachedR)}, ${gotD}, ${dContractEnd}, ${dPrice}, ${dPlan}, ${dProvider},
-        ${otherFollower}, ${blankToNull(input.phoneDialed)}
+        ${Boolean(input.reachedR)}, ${gotD}, ${otherFollower}, ${blankToNull(input.phoneDialed)}
       ) returning *`, "啱啱寫入嘅電話記錄");
+    call.carriers = await insertCarriers(tx, call.id, lines);
 
     const closed = await tx<{ id: string }[]>`
       update public.tasks
@@ -152,10 +213,8 @@ export interface UpdateCallInput {
   content?: string | null;
   reachedR?: boolean;
   gotD?: boolean;
-  dContractEnd?: string | null;
-  dPrice?: string | null;
-  dPlan?: string | null;
-  dProvider?: string | null;
+  /** 畀咗就成組換晒（網頁改嗰陣係成張表交上嚟）；唔畀就唔郁 */
+  carriers?: CarrierInput[] | null;
   attemptNo?: number;
 }
 
@@ -166,27 +225,30 @@ export async function updateCall(sql: Sql, id: string, patch: UpdateCallInput, a
   const set: Record<string, unknown> = {};
   if (patch.content !== undefined) set.content = blankToNull(patch.content);
   if (patch.reachedR !== undefined) set.reached_r = Boolean(patch.reachedR);
-  if (patch.dContractEnd !== undefined) {
-    const d = blankToNull(patch.dContractEnd);
-    if (d) assertDay(d);
-    set.d_contract_end = d;
-  }
-  if (patch.dPrice !== undefined) set.d_price = blankToNull(patch.dPrice);
-  if (patch.dPlan !== undefined) set.d_plan = blankToNull(patch.dPlan);
-  if (patch.dProvider !== undefined) set.d_provider = blankToNull(patch.dProvider);
+  const lines = patch.carriers !== undefined ? normalizeCarriers(patch.carriers) : null;
   if (patch.attemptNo !== undefined) {
     if (!Number.isInteger(patch.attemptNo) || patch.attemptNo < 1) throw new Error("第幾次致電要係 1 或以上嘅整數");
     set.attempt_no = patch.attemptNo;
   }
   if (patch.gotD !== undefined) set.got_d = Boolean(patch.gotD);
-  // 填咗 D 資料就算 D（同 logCall 一樣），除非佢明明白白剔走咗
-  else if (["d_contract_end", "d_price", "d_plan", "d_provider"].some((k) => set[k])) set.got_d = true;
+  // 填咗台嘅資料就算 D（同 logCall 一樣），除非佢明明白白剔走咗
+  else if (lines?.length) set.got_d = true;
   return sql.begin(async (tx) => {
     const before = one(await tx<CallRow[]>`select * from public.calls where id = ${id} for update`, "呢次電話記錄");
-    if (!Object.keys(set).length) return before;
-    const after = one(await tx<CallRow[]>`update public.calls set ${tx(set)} where id = ${id} returning *`, "改完嘅記錄");
+    await attachCarriers(tx, [before]);
+    if (!Object.keys(set).length && lines === null) return before;
+    const after = Object.keys(set).length
+      ? one(await tx<CallRow[]>`update public.calls set ${tx(set)} where id = ${id} returning *`, "改完嘅記錄")
+      : { ...before };
+    if (lines !== null) {
+      await tx`delete from public.call_carriers where call_id = ${id}`;
+      after.carriers = await insertCarriers(tx, id, lines);
+    } else {
+      after.carriers = before.carriers ?? [];
+    }
     await tx`insert into public.audit_log (actor, action, table_name, record_id, before, after)
-             values (${actor}, 'update_call', 'calls', ${id}, ${tx.json(toJson(before))}, ${tx.json(toJson(set))})`;
+             values (${actor}, 'update_call', 'calls', ${id}, ${tx.json(toJson(before))},
+                     ${tx.json(toJson(lines === null ? set : { ...set, carriers: lines }))})`;
     return after;
   });
 }
@@ -199,6 +261,7 @@ export async function updateCall(sql: Sql, id: string, patch: UpdateCallInput, a
 export async function deleteCall(sql: Sql, id: string, actor = "web"): Promise<{ reopened: number; removedTasks: number }> {
   return sql.begin(async (tx) => {
     const before = one(await tx<CallRow[]>`select * from public.calls where id = ${id} for update`, "呢次電話記錄");
+    await attachCarriers(tx, [before]); // audit 留低埋啲台，刪錯搵得返
     const removed = await tx`delete from public.tasks where source_call_id = ${id} and status = '待辦' returning id`;
     const reopened = await tx`
       update public.tasks set status = '待辦', closed_at = null, closed_by_call_id = null

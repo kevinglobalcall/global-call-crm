@@ -69,10 +69,9 @@ export async function companiesXlsx(sql: Sql, f: CompanyFilters, generatedAt = n
     { header: "最後結果", key: "last_outcome", width: 12 },
     { header: "R", key: "r", width: 4 },
     { header: "D", key: "d", width: 4 },
-    { header: "合約到期", key: "d_contract_end", width: 11 },
-    { header: "用緊邊個台", key: "d_provider", width: 12 },
-    { header: "而家價錢", key: "d_price", width: 12 },
-    { header: "而家套餐", key: "d_plan", width: 20 },
+    { header: "最早到期", key: "d_contract_end", width: 11 },
+    // 幾個台一格講晒（Kevin「要可以加不只一間電訊商」）—— 分開幾欄「CMHK / CSL」「130 / 150」會對唔到邊個價係邊個台
+    { header: "用緊嘅台", key: "carriers", width: 40 },
     { header: "興趣產品", key: "products", width: 24 },
     { header: "其他人跟進", key: "followed_by", width: 12 },
     { header: "MIS 查過", key: "mis", width: 8 },
@@ -89,6 +88,8 @@ export async function companiesXlsx(sql: Sql, f: CompanyFilters, generatedAt = n
       r: r.ever_r ? "✓" : "",
       d: r.ever_d ? "✓" : "",
       d_contract_end: r.d_contract_end ?? "",
+      carriers: (r.d_lines ?? []).map((x) => [x.provider ?? "（未知台）", x.contract_end ? `約滿 ${x.contract_end}` : "",
+        x.price, x.plan].filter(Boolean).join(" · ")).join("；"),
       products: r.product_ids.map((id) => pname.get(id) ?? "?").join("、"),
       mis: r.mis_checked ? "✓" : "",
     });

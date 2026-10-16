@@ -122,6 +122,11 @@ label.f > span { display: block; font-size: .82rem; color: var(--muted); margin-
 .outcomes button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .quick { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; }
 .dbox { border-left: 3px solid var(--d); padding: 8px 0 2px 12px; margin: 6px 0 10px; }
+/* 幾個台：每個台一格，中間間線 */
+.carrier + .carrier { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.carrier [data-cact="del"] { margin-top: 4px; }
+.carriers + [data-cact="add"] { margin-top: 8px; }
+.usingnow { margin-top: 6px; }
 .err { background: var(--bad-soft); color: var(--bad); padding: 8px 10px; border-radius: 8px; margin: 8px 0; }
 .note { background: var(--warn-soft); color: var(--warn); padding: 8px 10px; border-radius: 8px; margin: 8px 0; }
 .phones a { margin-right: 10px; white-space: nowrap; }

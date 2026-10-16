@@ -496,7 +496,7 @@
       m.statuses.map(function (st) { return opt(st, st, c.status); }).join("") + "</select> " + rd(c.ever_r, c.ever_d) +
       (c.industry ? ' <span class="muted">' + esc(c.industry) + "</span>" : "") +
       (c.call_count ? ' <span class="muted">打過 ' + c.call_count + " 次 · " + esc(c.last_outcome || "") + " " + esc(fmt(c.last_call_at, false)) + "</span>" : "") +
-      (c.d_contract_end ? ' <span class="pill d">' + esc(c.d_provider || "") + " 約滿 " + esc(c.d_contract_end) + "</span>" : "") +
+      carrierPills(c.d_lines) +
       (c.followed_by ? ' <span class="pill warn">' + esc(c.followed_by) + " 跟</span>" : "") +
       (c.mis_checked ? "" : ' <span class="pill">MIS 未查</span>') + "</div>" +
       '<div class="followbox" hidden><input type="text" data-v="follower" placeholder="邊個同事跟緊（可以留空）">' +
@@ -721,6 +721,55 @@
     ];
   }
 
+  // ── D：一間公司可以用緊幾個台（Kevin 2026-10-16「要可以加不只一間電訊商」）──────────────
+  /** 「CMHK · 約滿 2028-09-16 · 130 · 4G」 */
+  function carrierText(x) {
+    return [x.provider || "（未知台）", x.contract_end ? "約滿 " + x.contract_end : "", x.price, x.plan].filter(Boolean).join(" · ");
+  }
+  /** 清單行：一個台一粒（有到期日就寫埋） */
+  function carrierPills(lines) {
+    return (lines || []).map(function (x) {
+      return ' <span class="pill d carrier">' + esc((x.provider || "未知台") + (x.contract_end ? " 約滿 " + x.contract_end : "")) + "</span>";
+    }).join("");
+  }
+  function carrierRowHtml(x) {
+    return '<div class="carrier"><div class="grid2">' +
+      '<label class="f"><span>用緊邊個台</span><input type="text" data-c="provider" list="providers" value="' + esc(x.provider || "") + '"></label>' +
+      '<label class="f"><span>合約到期日</span><input type="date" data-c="contractEnd" value="' + esc(x.contract_end || "") + '"></label>' +
+      '<label class="f"><span>而家價錢</span><input type="text" data-c="price" placeholder="例：$198/月 × 12 條" value="' + esc(x.price || "") + '"></label>' +
+      '<label class="f"><span>套餐內容</span><input type="text" data-c="plan" placeholder="例：本地無限 + 20GB" value="' + esc(x.plan || "") + '"></label>' +
+      '</div><button type="button" class="btn sm danger" data-cact="del">刪呢個台</button></div>';
+  }
+  function carriersEditor(lines) {
+    return '<div class="carriers">' + lines.map(carrierRowHtml).join("") + "</div>" +
+      '<button type="button" class="btn sm" data-cact="add">＋再加一個台</button>';
+  }
+  /** 加／刪一個台；填字就叫 onInput（剔 D） */
+  function wireCarriersEditor(box, onInput) {
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-cact]");
+      if (!b) return;
+      var list = $(".carriers", box);
+      if (b.getAttribute("data-cact") === "add") {
+        list.insertAdjacentHTML("beforeend", carrierRowHtml({}));
+        var rows = $$(".carrier", list);
+        $('[data-c="provider"]', rows[rows.length - 1]).focus();
+      } else {
+        b.closest(".carrier").remove();
+        if (!$$(".carrier", list).length) list.insertAdjacentHTML("beforeend", carrierRowHtml({}));
+      }
+    });
+    if (onInput) box.addEventListener("input", function (e) { if (e.target.value && e.target.value.trim()) onInput(); });
+  }
+  /** 讀返成張表：空行唔送 */
+  function readCarriers(box) {
+    return $$(".carrier", box).map(function (r) {
+      var o = {};
+      ["provider", "contractEnd", "price", "plan"].forEach(function (k) { o[k] = $('[data-c="' + k + '"]', r).value.trim() || null; });
+      return o;
+    }).filter(function (o) { return o.provider || o.contractEnd || o.price || o.plan; });
+  }
+
   function callForm(d) {
     var phones = d.phones.filter(function (p) { return p.label !== "傳真"; });
     return '<div class="card" id="callform"><div class="spread"><h2 style="margin-top:0">記低今次電話</h2>' +
@@ -736,12 +785,8 @@
       '<div id="otherbox" hidden><label class="f"><span>邊個同事跟緊</span><input type="text" id="other" placeholder="同事名"></label></div>' +
       '<div class="row"><label class="check"><input type="checkbox" id="isR"> R 搵到負責人</label>' +
       '<label class="check"><input type="checkbox" id="isD"> D 攞到詳盡資料</label></div>' +
-      '<div class="dbox" id="dbox" hidden><div class="grid2">' +
-      '<label class="f"><span>合約到期日</span><input type="date" id="dEnd"></label>' +
-      '<label class="f"><span>用緊邊個台</span><input type="text" id="dProvider" list="providers"></label>' +
-      '<label class="f"><span>而家價錢</span><input type="text" id="dPrice" placeholder="例：$198/月 × 12 條"></label>' +
-      '<label class="f"><span>套餐內容</span><input type="text" id="dPlan" placeholder="例：本地無限 + 20GB"></label>' +
-      '</div><datalist id="providers">' + PROVIDERS.map(function (p) { return '<option value="' + esc(p) + '">'; }).join("") + "</datalist></div>" +
+      '<div class="dbox" id="dbox" hidden>' + carriersEditor([{}]) +
+      '<datalist id="providers">' + PROVIDERS.map(function (p) { return '<option value="' + esc(p) + '">'; }).join("") + "</datalist></div>" +
       (phones.length > 1 ? '<label class="f" style="margin-top:8px"><span>撥咗邊個號</span><select id="dialed">' +
         phones.map(function (p) { return opt(p.phone, p.phone.slice(0, 4) + " " + p.phone.slice(4) + "（" + p.label + "）", ""); }).join("") +
         "</select></label>" : "") +
@@ -776,9 +821,7 @@
     });
     $("#isD", form).addEventListener("change", function () { $("#dbox", form).hidden = !$("#isD", form).checked; });
     // 填咗任何 D 資料就自動剔 D（server 都會再保一次）
-    ["#dEnd", "#dProvider", "#dPrice", "#dPlan"].forEach(function (s) {
-      $(s, form).addEventListener("input", function () { if ($(s, form).value.trim()) $("#isD", form).checked = true; });
-    });
+    wireCarriersEditor($("#dbox", form), function () { $("#isD", form).checked = true; });
     save.addEventListener("click", function () {
       var err = $("#callerr", form);
       err.hidden = true;
@@ -796,8 +839,7 @@
         callbackAt: r.time === "none" ? null : (cb || null),
         content: $("#content", form).value.trim() || null,
         reachedR: $("#isR", form).checked, gotD: $("#isD", form).checked,
-        dContractEnd: $("#dEnd", form).value || null, dProvider: $("#dProvider", form).value.trim() || null,
-        dPrice: $("#dPrice", form).value.trim() || null, dPlan: $("#dPlan", form).value.trim() || null,
+        carriers: readCarriers($("#dbox", form)),
         otherFollower: chosen === "其他人跟進" ? other : null,
         phoneDialed: $("#dialed", form) ? $("#dialed", form).value : (d.phones.filter(function (p) { return p.label !== "傳真"; })[0] || {}).phone || null,
       };
@@ -845,21 +887,18 @@
   }
 
   function callHtml(k) {
-    var dBits = [k.d_provider, k.d_contract_end ? "約滿 " + k.d_contract_end : "", k.d_price, k.d_plan].filter(Boolean);
+    var lines = k.carriers || [];
     return '<div class="call" data-call="' + esc(k.id) + '"><div class="spread"><span><b>' + esc(fmt(k.called_at)) + "</b> 第 " + k.attempt_no + " 次 " +
       '<span class="pill ' + (k.outcome === "沒有人接" ? "" : k.outcome === "唔通" ? "bad" : "acc") + '">' + esc(k.outcome) + "</span> " + rd(k.reached_r, k.got_d) + "</span>" +
       '<span class="row"><button class="btn sm" data-act="edit">改</button><button class="btn sm danger" data-act="del">刪</button></span></div>' +
       (k.callback_at ? '<div class="small muted">約咗 ' + esc(fmt(k.callback_at)) + "</div>" : "") +
       (k.other_follower ? '<div class="small">同事：' + esc(k.other_follower) + "</div>" : "") +
-      (dBits.length ? '<div class="small" style="color:var(--d)">D：' + esc(dBits.join(" · ")) + "</div>" : "") +
+      lines.map(function (x) { return '<div class="small" style="color:var(--d)">D：' + esc(carrierText(x)) + "</div>"; }).join("") +
       (k.content ? '<div class="pre">' + esc(k.content) + "</div>" : "") +
       '<div class="edit" hidden><textarea data-e="content">' + esc(k.content || "") + "</textarea>" +
       '<div class="row" style="margin:6px 0"><label class="check"><input type="checkbox" data-e="reachedR"' + (k.reached_r ? " checked" : "") + "> R</label>" +
       '<label class="check"><input type="checkbox" data-e="gotD"' + (k.got_d ? " checked" : "") + "> D</label></div>" +
-      '<div class="grid2"><label class="f"><span>合約到期日</span><input type="date" data-e="dContractEnd" value="' + esc(k.d_contract_end || "") + '"></label>' +
-      '<label class="f"><span>用緊邊個台</span><input type="text" data-e="dProvider" value="' + esc(k.d_provider || "") + '"></label>' +
-      '<label class="f"><span>而家價錢</span><input type="text" data-e="dPrice" value="' + esc(k.d_price || "") + '"></label>' +
-      '<label class="f"><span>套餐內容</span><input type="text" data-e="dPlan" value="' + esc(k.d_plan || "") + '"></label></div>' +
+      '<div class="ecarriers">' + carriersEditor(lines.length ? lines : [{}]) + "</div>" +
       '<div class="small muted">結果改唔到 —— 揀錯就刪咗再記過（舊提醒會跟住返嚟）。</div>' +
       '<button class="btn sm primary" data-act="edit-save">存</button></div></div>';
   }
@@ -884,6 +923,8 @@
         (c.address_zh || c.address_en ? '<div class="small muted">' + esc([c.address_zh, c.address_en].filter(Boolean).join(" / ")) + "</div>" : "") +
         '<div class="small muted">' + esc([c.industry, c.customer_type === "個人" ? "個人客" : "", c.br_no ? "BR " + c.br_no : ""].filter(Boolean).join(" · ")) + "</div>" +
         (c.website ? '<div class="small site">🌐 ' + siteLinks(c.website) + "</div>" : "") +
+        ((c.d_lines || []).length ? '<div class="small usingnow"><b style="color:var(--d)">而家用緊：</b>' +
+          c.d_lines.map(function (x) { return "<div>" + esc(carrierText(x)) + "</div>"; }).join("") + "</div>" : "") +
         (c.followed_by ? '<div class="note">' + esc(c.followed_by) + " 跟緊 —— 唔好撞單</div>" : "") +
         '<div class="row" style="margin-top:8px"><label class="check"><input type="checkbox" id="mis"' + (c.mis_checked ? " checked" : "") + "> MIS 查過（唔係現有客）</label></div></div>";
 
@@ -951,6 +992,7 @@
       });
       $$("[data-call]").forEach(function (row) {
         var cid = row.getAttribute("data-call");
+        wireCarriersEditor($(".ecarriers", row), function () { $('[data-e="gotD"]', row).checked = true; });
         row.addEventListener("click", function (e) {
           var b = e.target.closest("[data-act]");
           if (!b) return;
@@ -965,8 +1007,7 @@
             var v = function (k) { return $('[data-e="' + k + '"]', row); };
             api("/calls/" + cid, {
               content: v("content").value.trim() || null, reachedR: v("reachedR").checked, gotD: v("gotD").checked,
-              dContractEnd: v("dContractEnd").value || null, dProvider: v("dProvider").value.trim() || null,
-              dPrice: v("dPrice").value.trim() || null, dPlan: v("dPlan").value.trim() || null,
+              carriers: readCarriers($(".ecarriers", row)),
             }).then(function () { toast("改咗"); render(); }).catch(function (er) { toast(er.message, true); });
           }
         });

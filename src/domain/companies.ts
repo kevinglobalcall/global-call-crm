@@ -11,7 +11,7 @@ import { COMPANY_STATUSES, type CompanyStatus } from "./outcomes.js";
 import { blankToNull, escapeLike, nameKey, nospace } from "../lib/text.js";
 import { parsePhoneCell, type PhoneLabel } from "../lib/phone.js";
 import { assertDay } from "../lib/time.js";
-import type { CallRow } from "./calls.js";
+import { attachCarriers, type CallRow } from "./calls.js";
 
 export interface CompanyFilters {
   q?: string;
@@ -54,6 +54,8 @@ export interface CompanyListRow {
   d_provider: string | null;
   d_price: string | null;
   d_plan: string | null;
+  /** 而家用緊邊幾個台（每個台攞最新嗰次電話講嘅），最早到期行先 */
+  d_lines: { provider: string | null; contract_end: string | null; price: string | null; plan: string | null }[];
   open_tasks: number;
   product_ids: string[];
   notes: string | null;
@@ -254,7 +256,8 @@ export async function getCompany(sql: Sql, idOrCode: string) {
       select p.id, p.name, p.category from public.company_products cp
         join public.products p on p.id = cp.product_id
        where cp.company_id = ${id} order by p.sort, p.name`,
-    sql<CallRow[]>`select * from public.calls where company_id = ${id} order by called_at desc limit 200`,
+    sql<CallRow[]>`select * from public.calls where company_id = ${id} order by called_at desc limit 200`
+      .then((rows) => attachCarriers(sql, rows)),
     sql<{ id: string; kind: string; due_at: Date | null; status: string; note: string | null;
           source_call_id: string | null; created_at: Date }[]>`
       select id, kind, due_at, status, note, source_call_id, created_at from public.tasks

@@ -14,6 +14,8 @@
 import postgres from "postgres";
 
 export type Sql = postgres.Sql<Record<string, unknown>>;
+/** 普通連線或者 transaction 入面都用得嘅 helper 參數 */
+export type SqlOrTx = Sql | postgres.TransactionSql<Record<string, unknown>>;
 export type JsonValue = postgres.JSONValue;
 
 /** 任何嘢 → 存得落 jsonb（Date 自動變 ISO 字串、undefined 欄剝走）。 */

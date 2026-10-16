@@ -60,7 +60,8 @@ describe("記電話", () => {
   it("填咗任何 D 資料就自動算 D；R 照剔", async () => {
     const id = await makeCompany(t.sql);
     const r = await logCall(t.sql, { companyId: id, outcome: "需要跟進", reachedR: true, dProvider: "CSL" });
-    expect(r.call).toMatchObject({ reached_r: true, got_d: true, d_provider: "CSL" });
+    expect(r.call).toMatchObject({ reached_r: true, got_d: true });
+    expect(r.call.carriers!.map((x) => x.provider)).toEqual(["CSL"]);
     const r2 = await logCall(t.sql, { companyId: id, outcome: "需要跟進" });
     expect(r2.call.got_d).toBe(false);
   });
@@ -68,7 +69,9 @@ describe("記電話", () => {
   it("❗合約到期日原樣存（香港 3/31 唔會變 3/30）", async () => {
     const id = await makeCompany(t.sql);
     const r = await logCall(t.sql, { companyId: id, outcome: "需要跟進", dContractEnd: "2027-03-31" });
-    expect(r.call.d_contract_end).toBe("2027-03-31");
+    expect(r.call.carriers![0]!.contract_end).toBe("2027-03-31");
+    const [row] = await t.sql`select contract_end::text as d from public.call_carriers where call_id = ${r.call.id}`;
+    expect(row!.d).toBe("2027-03-31");
   });
 
   it("JS 先擋：幾點鐘再打冇時間、亂寫日子 → 乜都冇寫", async () => {
@@ -132,8 +135,9 @@ describe("改／刪電話記錄", () => {
   it("改內容同 D；結果改唔到", async () => {
     const id = await makeCompany(t.sql);
     const r = await logCall(t.sql, { companyId: id, outcome: "需要跟進", content: "舊" });
-    const u = await updateCall(t.sql, r.call.id, { content: "新內容", dPrice: "$198 × 10" });
-    expect(u).toMatchObject({ content: "新內容", d_price: "$198 × 10", got_d: true });
+    const u = await updateCall(t.sql, r.call.id, { content: "新內容", carriers: [{ provider: "CSL", price: "$198 × 10" }] });
+    expect(u).toMatchObject({ content: "新內容", got_d: true });
+    expect(u.carriers!.map((x) => [x.provider, x.price])).toEqual([["CSL", "$198 × 10"]]);
     await expect(updateCall(t.sql, r.call.id, { outcome: "不需要" } as never)).rejects.toThrow(/結果改唔到/);
     const [a] = await t.sql`select action from public.audit_log where record_id = ${r.call.id} and action = 'update_call'`;
     expect(a).toBeTruthy();

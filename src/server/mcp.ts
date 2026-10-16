@@ -15,7 +15,7 @@ import {
   cancelAppointment, completeAppointment, createAppointment, getAppointment, listAppointments,
   noShowAppointment, rescheduleAppointment, updateAppointment, type AppointmentRow,
 } from "../domain/appointments.js";
-import { logCall } from "../domain/calls.js";
+import { logCall, type CarrierRow } from "../domain/calls.js";
 import {
   addContact, createCompany, emailsFromText, getCompany, listCompanies, phonesFromText, updateCompany, updateContact,
   type CompanyInput, type CompanyListRow, type ContactInput,
@@ -34,7 +34,7 @@ const INSTRUCTIONS = [
   "Kevin（Global Call 電訊 B2B 銷售）嘅冷電 CRM。用廣東話覆。",
   "記電話：log_call。結果一定係以下其中一個：" + OUTCOMES.join("、") + "。",
   "「幾點鐘再打」一定要有 callbackAt；「其他人跟進」一定要有 otherFollower（邊個同事）；「不需要」同「其他人跟進」唔可以有 callbackAt。",
-  "R ＝ 搵到負責人（reachedR）。D ＝ 攞到詳盡資料：合約到期日、而家價錢、套餐內容、用緊邊個台（dContractEnd／dPrice／dPlan／dProvider，填咗任何一樣就自動算 D）。R、D 分開判斷：前台講咗合約到期日算 D 唔算 R。",
+  "R ＝ 搵到負責人（reachedR）。D ＝ 攞到詳盡資料：用緊邊個台、合約到期日、而家價錢、套餐內容。一間公司可以用緊幾個台 —— log_call 畀 carriers（一個台一行：provider／contractEnd／price／plan），填咗任何一樣就自動算 D；淨係一個台都可以用 dProvider／dContractEnd／dPrice／dPlan。R、D 分開判斷：前台講咗合約到期日算 D 唔算 R。",
   "時間一律香港時間，寫「2026-10-20 15:00」。相對日子（聽日、下星期二）要由 today_stats 回嘅 today 計，覆 Kevin 嗰陣日期同星期一齊寫。",
   "公司要用 code（GC-00012）或者搜到唯一一間先寫；搜出幾間就列出嚟問 Kevin，唔好估。",
   "寫完睇返回應入面嘅 saved 先講「記低咗」；有錯就照講。",
@@ -50,12 +50,17 @@ function fail(e: unknown) {
   return { isError: true, content: [{ type: "text" as const, text: e instanceof Error ? e.message : String(e) }] };
 }
 
+function carrierOut(c: CarrierRow) {
+  return { provider: c.provider, contract_end: c.contract_end, price: c.price, plan: c.plan };
+}
+
 function brief(r: CompanyListRow) {
   return {
     id: r.id, code: r.code, name_zh: r.name_zh, name_en: r.name_en, industry: r.industry, status: r.status,
     phones: r.phones, emails: r.emails || null, calls: r.call_count,
     last_call: r.last_call_at ? fmtHk(r.last_call_at) : null, last_outcome: r.last_outcome,
     R: r.ever_r, D: r.ever_d, contract_end: r.d_contract_end, provider: r.d_provider,
+    carriers: (r.d_lines ?? []).length ? r.d_lines : undefined,
     followed_by: r.followed_by, open_tasks: r.open_tasks,
   };
 }
@@ -171,7 +176,7 @@ export function buildMcpServer(getSql: () => Sql, now: () => Date = () => new Da
       notes: c.company.notes, contacts: c.contacts, products: c.products,
       calls: c.calls.slice(0, 15).map((k) => ({
         when: fmtHk(k.called_at), attempt: k.attempt_no, outcome: k.outcome, R: k.reached_r, D: k.got_d,
-        content: k.content, contract_end: k.d_contract_end, price: k.d_price, plan: k.d_plan, provider: k.d_provider,
+        content: k.content, carriers: (k.carriers ?? []).map(carrierOut),
         callback: k.callback_at ? fmtHk(k.callback_at) : null,
       })),
       tasks: c.tasks.map((t) => ({ ...t, due: t.due_at ? fmtHk(t.due_at) : null })),
@@ -232,10 +237,16 @@ export function buildMcpServer(getSql: () => Sql, now: () => Date = () => new Da
       content: optStr,
       reachedR: z.boolean().optional().describe("搵到負責人"),
       gotD: z.boolean().optional(),
-      dContractEnd: optStr.describe("合約到期日 YYYY-MM-DD"),
-      dPrice: optStr.describe("而家價錢（照講法寫，例如「$298/月 × 5 條」）"),
-      dPlan: optStr.describe("而家套餐內容"),
-      dProvider: optStr.describe("用緊邊個台（CSL／CMHK／3HK／SmarTone…）"),
+      carriers: z.array(z.object({
+        provider: optStr.describe("用緊邊個台（CSL／CMHK／3HK／SmarTone…）"),
+        contractEnd: optStr.describe("合約到期日 YYYY-MM-DD"),
+        price: optStr.describe("而家價錢（照講法寫，例如「$298/月 × 5 條」）"),
+        plan: optStr.describe("而家套餐內容"),
+      })).max(20).optional().describe("用緊嘅台，一個台一行（例如一半線 CMHK、一半 CSL 就兩行）"),
+      dContractEnd: optStr.describe("（淨係一個台嘅簡寫）合約到期日 YYYY-MM-DD"),
+      dPrice: optStr.describe("（淨係一個台嘅簡寫）而家價錢"),
+      dPlan: optStr.describe("（淨係一個台嘅簡寫）而家套餐內容"),
+      dProvider: optStr.describe("（淨係一個台嘅簡寫）用緊邊個台"),
       otherFollower: optStr.describe("「其他人跟進」：邊個同事"),
       attemptNo: z.number().int().min(1).optional().describe("第幾次致電；唔畀就自動 ＝ 打過幾多次 +1"),
       calledAt: optStr.describe("唔係啱啱打嘅先畀，香港時間"),
@@ -249,6 +260,7 @@ export function buildMcpServer(getSql: () => Sql, now: () => Date = () => new Da
       callbackAt: a.callbackAt ? parseHkDateTime(a.callbackAt) : null,
       calledAt: a.calledAt ? parseHkDateTime(a.calledAt) : now(),
       content: a.content ?? null, reachedR: a.reachedR ?? false, gotD: a.gotD ?? false,
+      carriers: a.carriers ?? null,
       dContractEnd: a.dContractEnd ?? null, dPrice: a.dPrice ?? null, dPlan: a.dPlan ?? null,
       dProvider: a.dProvider ?? null, otherFollower: a.otherFollower ?? null, attemptNo: a.attemptNo ?? null,
     }, "claude");
@@ -261,7 +273,9 @@ export function buildMcpServer(getSql: () => Sql, now: () => Date = () => new Da
     }
     // readback：由 DB 讀返，唔係照抄自己寫咗乜
     const back = (await getCompany(sql, r.id))!;
-    const saved = back.calls.some((k) => k.id === res.call.id);
+    const backCall = back.calls.find((k) => k.id === res.call.id);
+    // 台都要數得返先算記低咗（唔係淨係睇有冇嗰次電話）
+    const saved = Boolean(backCall) && (backCall!.carriers ?? []).length === (res.call.carriers ?? []).length;
     products = back.products.map((p) => p.name);
     return {
       saved,
@@ -269,8 +283,9 @@ export function buildMcpServer(getSql: () => Sql, now: () => Date = () => new Da
       call: {
         when: fmtHk(res.call.called_at), attempt: res.call.attempt_no, outcome: res.call.outcome,
         connected: res.connected, R: res.call.reached_r, D: res.call.got_d,
-        contract_end: res.call.d_contract_end, provider: res.call.d_provider,
+        carriers: (backCall?.carriers ?? []).map(carrierOut),
       },
+      companyCarriersNow: back.company.d_lines,
       status: res.statusBefore === res.statusAfter ? res.statusAfter : `${res.statusBefore} → ${res.statusAfter}`,
       closedOldTasks: res.closedTasks,
       newTask: res.task ? { kind: res.task.kind, due: res.task.due_at ? fmtHk(res.task.due_at) : "（冇指定時間，今日回撥清單會出）" } : null,

@@ -122,7 +122,11 @@ export async function statsDetail(sql: Sql, kind: DetailKind, from: string, to: 
   const start = hkDayStart(from);
   const end = hkDayStart(addDays(to, 1));
   const name = sql`coalesce(nullif(btrim(c.name_zh), ''), c.name_en)`;
-  const dInfo = sql`nullif(concat_ws(' · ', k.d_provider, case when k.d_contract_end is not null then '約滿 ' || k.d_contract_end end, k.d_price, k.d_plan), '')`;
+  // 幾個台一行講晒：「CMHK · 約滿 2028-09-16 · 130；CSL · 150」
+  const dInfo = sql`(select nullif(string_agg(concat_ws(' · ', cc.provider,
+                       case when cc.contract_end is not null then '約滿 ' || cc.contract_end end, cc.price, cc.plan),
+                       '；' order by cc.sort, cc.created_at), '')
+                       from public.call_carriers cc where cc.call_id = k.id)`;
   switch (kind) {
     case "calls":
     case "connected":

@@ -123,7 +123,7 @@ function companyFixture(over: Record<string, unknown> = {}) {
     contacts: [], products: [{ id: "11111111-1111-1111-1111-111111111111", name: "SME Bundle — Business Connect" }],
     calls: [{
       id: "kkkkkkkk-0000-0000-0000-000000000001", called_at: "2026-10-13T02:00:00.000Z", attempt_no: 2, outcome: "沒有人接",
-      reached_r: false, got_d: false, content: "冇人聽", callback_at: null, d_contract_end: null, d_provider: null, d_price: null, d_plan: null,
+      reached_r: false, got_d: false, content: "冇人聽", callback_at: null, carriers: [],
     }],
     tasks: [], nextAttempt: 3,
     remarks: [
@@ -133,9 +133,9 @@ function companyFixture(over: Record<string, unknown> = {}) {
   };
 }
 
-async function companyPage(over: Record<string, unknown> = {}) {
+async function companyPage(over: Record<string, unknown> = {}, top: Record<string, unknown> = {}) {
   return boot(`#/c/${CID}`, {
-    "/meta": META, [`/companies/${CID}`]: companyFixture(over),
+    "/meta": META, [`/companies/${CID}`]: { ...companyFixture(over), ...top },
     "/calls": { call: { attempt_no: 3, outcome: "x" }, statusBefore: "跟進中", statusAfter: "跟進中", closedTasks: 1, task: null },
   });
 }
@@ -195,9 +195,9 @@ describe("公司頁：記電話", () => {
     click(d.querySelector('[data-time="2026-10-15T15:00"]'));
     expect((d.querySelector("#callback") as HTMLInputElement).value).toBe("2026-10-15T15:00");
     (d.querySelector("#isR") as HTMLInputElement).click();
-    const prov = d.querySelector("#dProvider") as HTMLInputElement;
+    const prov = d.querySelector('#dbox [data-c="provider"]') as HTMLInputElement;
     prov.value = "CSL";
-    prov.dispatchEvent(new d.defaultView!.Event("input"));
+    prov.dispatchEvent(new d.defaultView!.Event("input", { bubbles: true }));
     expect((d.querySelector("#isD") as HTMLInputElement).checked).toBe(true);
     (d.querySelector("#content") as HTMLTextAreaElement).value = "IT 經理 Peter";
     click(d.querySelector("#save"));
@@ -205,7 +205,7 @@ describe("公司頁：記電話", () => {
     expect(posts()[0]!.url).toBe("/app/api/calls");
     expect(posts()[0]!.body).toEqual({
       companyId: CID, outcome: "幾點鐘再打", attemptNo: 3, callbackAt: "2026-10-15T15:00", content: "IT 經理 Peter",
-      reachedR: true, gotD: true, dContractEnd: null, dProvider: "CSL", dPrice: null, dPlan: null,
+      reachedR: true, gotD: true, carriers: [{ provider: "CSL", contractEnd: null, price: null, plan: null }],
       otherFollower: null, phoneDialed: "23456789",
     });
   });
@@ -632,6 +632,79 @@ describe("公司清單每行：R 負責人格（Kevin 2026-10-16「要有位置�
     click(f.querySelector('[data-act="r-save"]'));
     await tick(5);
     expect(posts().at(-1)).toMatchObject({ url: `/app/api/companies/${CID}/contacts`, body: { name: "Ken Lee" } });
+  });
+});
+
+describe("D：幾個台（Kevin 2026-10-16「要可以加不只一間電訊商」）", () => {
+  const fill = (d: Document, row: Element, k: string, v: string) => {
+    const el = row.querySelector(`[data-c="${k}"]`) as HTMLInputElement;
+    el.value = v;
+    el.dispatchEvent(new d.defaultView!.Event("input", { bubbles: true }));
+  };
+
+  it("記電話：撳「＋再加一個台」填兩個 → 一次送兩行；空嗰行唔送；刪咗嗰行唔送", async () => {
+    const { d, posts } = await companyPage();
+    click(d.querySelector('[data-outcome="需要跟進"]'));
+    (d.querySelector("#isD") as HTMLInputElement).click();
+    const box = d.querySelector("#dbox")!;
+    fill(d, box.querySelectorAll(".carrier")[0]!, "provider", "CMHK 中國移動");
+    fill(d, box.querySelectorAll(".carrier")[0]!, "contractEnd", "2028-09-16");
+    fill(d, box.querySelectorAll(".carrier")[0]!, "price", "130");
+    click(box.querySelector('[data-cact="add"]'));
+    fill(d, box.querySelectorAll(".carrier")[1]!, "provider", "CSL");
+    fill(d, box.querySelectorAll(".carrier")[1]!, "price", "150");
+    click(box.querySelector('[data-cact="add"]'));               // 第三行留空
+    click(box.querySelector('[data-cact="add"]'));
+    fill(d, box.querySelectorAll(".carrier")[3]!, "provider", "3HK");
+    click(box.querySelectorAll(".carrier")[3]!.querySelector('[data-cact="del"]'));  // 填完又刪
+    expect(box.querySelectorAll(".carrier").length).toBe(3);
+    click(d.querySelector("#save"));
+    await tick();
+    expect((posts()[0]!.body as { carriers: unknown }).carriers).toEqual([
+      { provider: "CMHK 中國移動", contractEnd: "2028-09-16", price: "130", plan: null },
+      { provider: "CSL", contractEnd: null, price: "150", plan: null },
+    ]);
+  });
+
+  it("時間線：一次電話兩個台出兩行 D；撳「改」預填兩行；改完成組送返", async () => {
+    const { d, posts } = await companyPage({}, {
+      calls: [{
+        id: "kkkkkkkk-0000-0000-0000-000000000001", called_at: "2026-10-16T08:53:00.000Z", attempt_no: 1, outcome: "需要跟進",
+        reached_r: true, got_d: true, content: "mr.hui 68485169", callback_at: null,
+        carriers: [
+          { id: "c1", provider: "CMHK 中國移動", contract_end: "2028-09-16", price: "130", plan: "4G" },
+          { id: "c2", provider: "CSL", contract_end: null, price: "150", plan: null },
+        ],
+      }],
+    });
+    const call = d.querySelector('[data-call="kkkkkkkk-0000-0000-0000-000000000001"]')!;
+    const dl = [...call.querySelectorAll(":scope > .small")].map((x) => x.textContent).filter((x) => x!.startsWith("D："));
+    expect(dl).toEqual(["D：CMHK 中國移動 · 約滿 2028-09-16 · 130 · 4G", "D：CSL · 150"]);
+    click(call.querySelector('[data-act="edit"]'));
+    const rows = call.querySelectorAll(".ecarriers .carrier");
+    expect(rows.length).toBe(2);
+    expect((rows[1]!.querySelector('[data-c="provider"]') as HTMLInputElement).value).toBe("CSL");
+    click(call.querySelector('.ecarriers [data-cact="add"]'));
+    fill(d, call.querySelectorAll(".ecarriers .carrier")[2]!, "provider", "SmarTone");
+    click(call.querySelector('[data-act="edit-save"]'));
+    await tick();
+    expect(posts().at(-1)!.url).toBe("/app/api/calls/kkkkkkkk-0000-0000-0000-000000000001");
+    expect(((posts().at(-1)!.body as { carriers: unknown }).carriers as { provider: string }[]).map((x) => x.provider)).toEqual(["CMHK 中國移動", "CSL", "SmarTone"]);
+  });
+
+  it("公司頁頂出「而家用緊」逐個台；清單行一個台一粒", async () => {
+    const lines = [
+      { provider: "CMHK 中國移動", contract_end: "2028-09-16", price: "130", plan: "4G" },
+      { provider: "CSL", contract_end: null, price: "150", plan: null },
+    ];
+    const { d } = await companyPage({ d_lines: lines });
+    expect([...d.querySelectorAll(".usingnow div")].map((x) => x.textContent)).toEqual(["CMHK 中國移動 · 約滿 2028-09-16 · 130 · 4G", "CSL · 150"]);
+    const L = await boot("#/companies", { "/meta": META, "/companies": { total: 1, totalR: 0, totalD: 1, rows: [{
+      id: CID, code: "GC-00012", name_zh: "大發", name_en: null, status: "跟進中", ever_r: true, ever_d: true, industry: null,
+      call_count: 1, last_outcome: "需要跟進", last_call_at: null, followed_by: null, mis_checked: true, phones: "", emails: "",
+      d_lines: lines, contacts: [] }] } });
+    await tick();
+    expect([...L.d.querySelectorAll(`[data-row="${CID}"] .pill.carrier`)].map((x) => x.textContent)).toEqual(["CMHK 中國移動 約滿 2028-09-16", "CSL"]);
   });
 });
 

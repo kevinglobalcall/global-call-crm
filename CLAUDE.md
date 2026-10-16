@@ -172,6 +172,21 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
 - ❗**auto 模式下改 CRM 資料（MCP 寫入）仍然會問 Kevin 批准**，而我唔准自己改權限設定（self-modification 被擋）。
   佢問「為什麼不停要允許」—— 答案係寫 production 資料嗰類動作；改 code、跑 test 唔會問。
 
+## D：一間公司幾個台（Kevin 2026-10-16「要可以加不只一間電訊商」，掉咗 CMHK 嗰張 D 截圖）
+
+- D 資料喺 **`call_carriers`**（一次電話幾行，一個台一行：provider／contract_end／price／plan）。
+  舊 `calls.d_*` 四個欄 migration `20261016000500` 搬晒入嚟之後 **drop 咗** —— 唔留兩本數。
+- **「而家用緊」＝ `company_carriers_current`**：同一個台（`public.nospace(provider)`，空格大細楷唔理）攞最新嗰次電話講嘅；
+  ❗再打一次淨係講 CSL 新價，**CMHK 照留**（唔係「最新嗰次電話」成組蓋晒 —— 嗰個寫法會靜靜雞洗走其他台）。
+  冇講台名嘅（前台淨係講到期日）當一個「未知台」。
+- `company_overview`：`d_contract_end` ＝ 最早到期嗰個台（排序／篩選）；`d_provider/price/plan` 用「 / 」串；`d_lines` 逐個台（網頁、MCP）。
+  匯出 Excel 用一格「用緊嘅台」講晒（分開幾欄對唔到邊個價係邊個台）。
+- **續約逐個台出**（CMHK 到期唔會俾 CSL 遠啲嘅日子遮住）；收埋係 (公司, 到期日, 段)。
+- 網頁：記電話同改電話都係「＋再加一個台」／「刪呢個台」；改嗰陣係**成組換**（`updateCall` 畀 `carriers` 就 delete＋insert，唔畀唔郁）。
+  公司頁頂出「而家用緊」；清單行一個台一粒 `.pill.carrier`（❗唔好用 `.pill.d` 揀 —— R/D 嗰粒 D 都係 `pill d`）。
+- MCP `log_call`：`carriers: [{provider, contractEnd, price, plan}]`；舊 `dProvider…` 照收，變第一行。readback 要數得返台先 `saved`。
+- 本機 11,803 間：`company_overview` 50 行 0.5ms（distinct on 個 company_id 推得落 index），冇變慢。
+
 ## 撳個數睇係邊幾間（Kevin 2026-10-16「要能夠點開顯示什麼公司」）
 
 - 今日、本星期、揀日子嗰幾格（`statTiles`）同每日表入面啲數全部係連結 → `#/stats/detail?kind=&from=&to=`。
