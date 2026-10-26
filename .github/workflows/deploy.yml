@@ -9,6 +9,16 @@ name: ② 測試＋部署
 on:
   push:
     branches: [main]
+    # ❗淨係改到部機會行嘅嘢先部署：CRM 熄咗機之後（2026-10-26），改 workflow／文件唔可以令部機翻生
+    paths:
+      - "src/**"
+      - "public/**"
+      - "supabase/**"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile"
+      - "fly.toml"
+      - "tsconfig.json"
   pull_request:
   workflow_dispatch:
 

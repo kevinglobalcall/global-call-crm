@@ -8,9 +8,11 @@
 
 name: ⑤ 每晚備份
 
+# ❗2026-10-26 Kevin「crm停止運作」→「想熄咗佢」：CRM 停用，每晚自動備份停咗（淨係留手動）。
+#   開返用就將下面兩行 schedule 解返註釋。
 on:
-  schedule:
-    - cron: "7 19 * * *" # UTC 19:07 ＝ 香港 03:07（唔揀整點，避開 GitHub 塞車）
+  # schedule:
+  #   - cron: "7 19 * * *" # UTC 19:07 ＝ 香港 03:07（唔揀整點，避開 GitHub 塞車）
   workflow_dispatch:
 
 jobs:

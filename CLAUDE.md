@@ -248,6 +248,15 @@ npx vitest run && npx tsc --noEmit        # merge 前兩樣都要綠（main 紅 
 - **scratchpad 唔跨 container**：工具、快取要入 repo（`scripts/`），唔好留喺 scratchpad。
 - 新目錄站第一件事開 `robots.txt`，唔准爬就唔爬。
 
+## ❗2026-10-26 CRM 停用（Kevin「crm停止運作」→ 問清楚係「想熄咗佢」，唔係壞咗）
+
+- 問之前查過：server `/health` 200、DB 答到（過去 7 日 321 通電話）—— 即係唔係壞，所以要問，唔好估住去熄。
+- 做咗：⑤ 最後一次完整備份（pg_dump ＋ 每張表 CSV，GitHub artifact 留 90 日）→ ⑦ 熄機（`scale count 0`）→ ⑦ 睇數。
+- **資料一行都冇剷**：Supabase 照留，Fly app／secrets／image 照留。開返：⑦ 揀「開返機」；起唔返就行 ② 部署。
+- ⑤ 每晚備份個 cron 註釋咗（淨係手動）；② 部署加咗 `paths`：淨係改 src／public／supabase／package／Dockerfile／fly.toml 先部署
+  —— ❗唔加嘅話，熄機之後任何 push（連改 CLAUDE.md）都會 `flyctl deploy`，部機即刻翻生。
+- 熄咗機之後 claude.ai 嗰個 gc 連接器（MCP 喺部機度）都會用唔到 —— 唔係壞咗。
+
 ## 未做／等 Kevin
 
 - Kevin 要自己做：開 repo、Supabase project（Free org、Singapore）、GitHub secrets
